@@ -22,6 +22,9 @@ function logout() { token = null; me = null; localStorage.removeItem(TOKEN_KEY);
 const root = () => $('#root');
 
 async function render() {
+  // 서버가 book.html 응답에 미리 넣어준 텍스트 기반 요약(#ssr, 검색엔진·기본 웹브라우징용)은
+  // 실제 앱이 정상적으로 뜨면 더 이상 필요 없으므로 제거한다.
+  document.getElementById('ssr')?.remove();
   if (!code) { root().innerHTML = '<div class="bhead"><h1>예약 링크가 올바르지 않습니다</h1><p class="muted">매장에서 안내받은 예약 링크로 다시 접속해 주세요.</p></div>'; return; }
   try { info = await get(`/api/public/${code}/info`); }
   catch (e) { root().innerHTML = `<div class="bhead"><h1>${esc(e.message)}</h1></div>`; return; }

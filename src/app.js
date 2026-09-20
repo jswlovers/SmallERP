@@ -23,6 +23,7 @@ import opsRoutes from './routes/ops.js';
 import insightRoutes from './routes/insight.js';
 import publicRoutes from './routes/public.js';
 import aiChatRoutes from './routes/aiChat.js';
+import pagesRoutes from './routes/pages.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -68,7 +69,7 @@ export function buildApp({ db = openDb(), sms = mockProvider, runAiTurn = defaul
 
   app.get('/api/health', async () => ({ ok: true }));
 
-  for (const r of [authRoutes, staffRoutes, customerRoutes, serviceRoutes, reservationRoutes, paymentRoutes, statsRoutes, messageRoutes, adminRoutes, catalogRoutes, walletRoutes, scheduleRoutes, opsRoutes, insightRoutes, publicRoutes, aiChatRoutes]) {
+  for (const r of [authRoutes, staffRoutes, customerRoutes, serviceRoutes, reservationRoutes, paymentRoutes, statsRoutes, messageRoutes, adminRoutes, catalogRoutes, walletRoutes, scheduleRoutes, opsRoutes, insightRoutes, publicRoutes, aiChatRoutes, pagesRoutes]) {
     r(app, ctx);
   }
 
