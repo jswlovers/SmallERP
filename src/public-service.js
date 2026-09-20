@@ -41,6 +41,7 @@ export function getInfo(db, shop) {
 
 export function getAvailability(db, shop, { date, serviceIds, staffId }) {
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw bad('date(YYYY-MM-DD)가 필요합니다.');
+  if (date < todayLocal()) throw bad(`${date}는 이미 지난 날짜입니다. 오늘(${todayLocal()}) 이후 날짜로 다시 확인해 주세요.`);
   const ids = String(serviceIds || '').split(',').filter(Boolean).map(Number);
   if (!ids.length) throw bad('시술을 선택하세요.');
   const dur = ids.reduce((a, id) => a + (db.prepare('SELECT duration_min FROM service WHERE id = ? AND shop_id = ? AND active = 1').get(id, shop.id)?.duration_min ?? 0), 0);
@@ -139,7 +140,9 @@ export async function createReservation(ctx, shop, customerId, { startAt, servic
   const booking = getSetting(ctx.db, shop.id, 'public_booking', DEFAULT_SETTINGS.public_booking);
   if (!booking.enabled) throw new HttpError(403, '지금은 온라인 예약을 받지 않는 매장입니다. 전화로 문의해 주세요.');
   const start = dt(startAt, 'startAt');
-  if (start < addMinutes(nowLocal(), booking.minLeadMinutes)) throw bad(`예약은 최소 ${booking.minLeadMinutes}분 전에 가능합니다.`);
+  const now = nowLocal();
+  if (start < now) throw bad(`${startAt}는 이미 지난 시간입니다. 오늘(${now.slice(0, 10)}) 이후의 미래 날짜·시간으로 다시 요청해 주세요.`);
+  if (start < addMinutes(now, booking.minLeadMinutes)) throw bad(`예약은 최소 ${booking.minLeadMinutes}분 전에 가능합니다.`);
   if (start.slice(0, 10) > addDays(todayLocal(), booking.maxDays)) throw bad(`예약은 최대 ${booking.maxDays}일 이내만 가능합니다.`);
   const status = booking.autoConfirm ? 'confirmed' : 'pending';
   return bookReservation(ctx, shop.id, {

@@ -130,8 +130,21 @@ test('예약 최소 리드타임/최대 기간을 벗어나면 거부된다', as
   const startAt = `${soon.getFullYear()}-${p2(soon.getMonth() + 1)}-${p2(soon.getDate())}T${p2(soon.getHours())}:${p2(soon.getMinutes())}`;
   const tooSoon = await call('POST', `/api/public/${code}/reservations`, { startAt, serviceIds: [svc['커트'].id] }, token);
   assert.equal(tooSoon.status, 400);
+  assert.match(tooSoon.body.error, /최소 60분 전/); // "이미 지난 시간"과는 다른 문구여야 함(아직 미래이지만 너무 임박)
   const tooFar = await call('POST', `/api/public/${code}/reservations`, { startAt: `${addDays(todayLocal(), 60)}T10:00`, serviceIds: [svc['커트'].id] }, token);
   assert.equal(tooFar.status, 400);
+});
+
+test('연도를 잘못 계산해 과거 날짜로 예약을 시도하면 "지난 시간"이라고 분명히 알려준다(AI가 원인을 바로 알 수 있도록)', async () => {
+  const r = await requestOtp('010-6150-0001');
+  const { token } = (await verifyOtp('010-6150-0001', r.body.devCode, '작년착각')).body;
+  const past = await call('POST', `/api/public/${code}/reservations`, { startAt: '2020-01-01T10:00', serviceIds: [svc['커트'].id] }, token);
+  assert.equal(past.status, 400);
+  assert.match(past.body.error, /이미 지난 시간/);
+  assert.doesNotMatch(past.body.error, /최소 60분 전/); // "너무 임박함"과 혼동되지 않아야 함
+  const pastAvail = await call('GET', `/api/public/${code}/availability?date=2020-01-01&serviceIds=${svc['커트'].id}`, null, token);
+  assert.equal(pastAvail.status, 400);
+  assert.match(pastAvail.body.error, /이미 지난 날짜/);
 });
 
 test('겹치는 시간은 거부되고, 이미 다른 예약이 있으면 직접 지정한 담당자에만 충돌 체크가 걸린다', async () => {

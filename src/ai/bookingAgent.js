@@ -1,4 +1,4 @@
-import { HttpError } from '../util.js';
+import { HttpError, nowLocal } from '../util.js';
 import * as svc from '../public-service.js';
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5';
@@ -32,11 +32,17 @@ const TOOLS = [
 ];
 
 function systemPrompt(shop, session) {
+  const now = nowLocal(); // 'YYYY-MM-DDTHH:mm', 매장 서버 로컬 시각
+  const today = now.slice(0, 10);
+  const weekday = ['일', '월', '화', '수', '목', '금', '토'][new Date(`${today}T00:00:00`).getDay()];
   const base = `당신은 "${shop.name}"의 예약 도우미입니다. 한국어로 짧고 친절하게 답하세요.
+현재 시각은 ${today}(${weekday}요일) ${now.slice(11)}입니다.
 규칙:
+- 고객이 "내일", "이번 주 토요일", "9월 23일"처럼 연도를 말하지 않거나 상대적인 날짜를 말하면, 반드시 위 현재 시각을 기준으로 정확한 연도(YYYY)까지 계산해서 getAvailability/createReservation에 넘기세요. 절대 임의의 연도를 추측하지 마세요.
 - 예약하려는 시술과 원하는 날짜를 먼저 확인하고, getAvailability로 실제 가능한 시간을 확인한 뒤 안내하세요. 시간을 지어내지 마세요.
 - 시술 ID·담당자 ID 같은 내부 값은 고객에게 보여주지 말고 이름으로만 이야기하세요.
 - createReservation·listMyReservations·cancelReservation은 반드시 인증(로그인)된 뒤에만 호출할 수 있습니다.
+- 도구가 오류를 반환하면 그 오류 문구를 그대로 고객에게 전하지 말고, 원인을 파악해 자연스럽게 안내하거나 필요한 정보를 다시 물어보세요.
 - 대화는 이 매장 예약 안내로만 한정합니다.`;
   if (session.customerId) return `${base}\n- 이 고객은 이미 인증되었고 이름은 "${session.customerName}"입니다. 다시 인증을 요구하지 마세요.`;
   return `${base}\n- 아직 인증되지 않았습니다. 예약/조회/취소 전에는 휴대폰 번호를 물어 requestOtp를 호출하고, 문자로 받은 인증번호를 받아 verifyOtp를 호출해 먼저 로그인시키세요.`;

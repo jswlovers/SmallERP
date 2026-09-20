@@ -119,3 +119,12 @@ test('도구 호출이 끝없이 이어지면 안전장치가 대화를 종료�
   assert.equal(calls, 6); // MAX_TOOL_ROUNDS
   assert.match(reply, /시간이 걸리고|다시 시도/);
 });
+
+test('시스템 프롬프트에 오늘 날짜가 명시된다(연도 추측으로 "이미 지난 시간" 오류가 나던 실사용 버그 회귀 방지)', async () => {
+  const { runTurn } = await import('../src/ai/bookingAgent.js');
+  const session = newSession();
+  let seenSystem;
+  await runTurn(ctx(), shop, session, '오늘이 며칠이야?', async (p) => { seenSystem = p.system; return finalText('확인했습니다.'); });
+  assert.match(seenSystem, new RegExp(todayLocal().replace(/-/g, '-')));
+  assert.match(seenSystem, /연도.*계산|임의의 연도를 추측하지/);
+});
