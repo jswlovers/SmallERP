@@ -1,0 +1,153 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SmallERP 고객 온라인 예약 API",
+    "version": "1.0.0",
+    "description": "매장 직원 로그인과 분리된 고객 셀프 예약 공개 API. 휴대폰 인증(OTP)만으로 가입/로그인하고, 예약 생성·조회·취소를 할 수 있다. ChatGPT Custom GPT Actions 또는 Claude API의 tool_use 정의로 그대로 가져다 쓸 수 있도록 작성했다."
+  },
+  "servers": [{ "url": "https://smallerp.sean2022.one:3001", "description": "운영" }, { "url": "https://localhost:3001", "description": "로컬 개발" }],
+  "security": [{}],
+  "paths": {
+    "/api/public/{code}/info": {
+      "get": {
+        "operationId": "getShopInfo",
+        "summary": "매장 정보, 시술·직원 목록, 온라인 예약 정책 조회",
+        "parameters": [{ "$ref": "#/components/parameters/ShopCode" }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": {
+              "type": "object",
+              "properties": {
+                "shopName": { "type": "string" },
+                "services": { "type": "array", "items": { "$ref": "#/components/schemas/Service" } },
+                "staff": { "type": "array", "items": { "$ref": "#/components/schemas/Staff" } },
+                "booking": { "$ref": "#/components/schemas/BookingPolicy" }
+              }
+            } } }
+          },
+          "404": { "description": "존재하지 않는 예약 코드" },
+          "403": { "description": "이용이 정지된 매장" }
+        }
+      }
+    },
+    "/api/public/{code}/availability": {
+      "get": {
+        "operationId": "getAvailability",
+        "summary": "특정 날짜에 예약 가능한 시간 목록 조회 (담당자를 지정하지 않으면 가능한 직원을 모두 합쳐서 보여준다)",
+        "parameters": [
+          { "$ref": "#/components/parameters/ShopCode" },
+          { "name": "date", "in": "query", "required": true, "schema": { "type": "string", "format": "date" }, "description": "YYYY-MM-DD" },
+          { "name": "serviceIds", "in": "query", "required": true, "schema": { "type": "string" }, "description": "시술 ID를 쉼표로 구분 (예: 1,3). 총 소요시간 계산에 쓰인다." },
+          { "name": "staffId", "in": "query", "required": false, "schema": { "type": "integer" }, "description": "특정 담당자만 조회하고 싶을 때" }
+        ],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": {
+            "type": "object",
+            "properties": { "date": { "type": "string" }, "minutes": { "type": "integer" }, "slots": { "type": "array", "items": { "type": "string" }, "description": "HH:mm 목록" } }
+          } } } },
+          "400": { "description": "날짜/시술 파라미터 오류" }
+        }
+      }
+    },
+    "/api/public/{code}/otp/request": {
+      "post": {
+        "operationId": "requestOtp",
+        "summary": "휴대폰 인증번호 발송 (신규 고객이면 검증 성공 시 자동 가입됨)",
+        "parameters": [{ "$ref": "#/components/parameters/ShopCode" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "required": ["phone"], "properties": { "phone": { "type": "string", "description": "010-0000-0000 형식" } }
+        } } } },
+        "responses": {
+          "200": { "description": "발송됨", "content": { "application/json": { "schema": {
+            "type": "object", "properties": { "ok": { "type": "boolean" }, "devCode": { "type": "string", "description": "운영 환경이 아닐 때만 테스트용으로 내려온다. 실서비스에서는 없다." } }
+          } } } },
+          "400": { "description": "휴대폰 번호 형식 오류" },
+          "429": { "description": "재발송 쿨다운(60초) 또는 하루 발송 한도(8회) 초과" }
+        }
+      }
+    },
+    "/api/public/{code}/otp/verify": {
+      "post": {
+        "operationId": "verifyOtp",
+        "summary": "인증번호 확인. 성공하면 이후 요청에 쓸 Bearer 토큰을 돌려준다.",
+        "parameters": [{ "$ref": "#/components/parameters/ShopCode" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "required": ["phone", "code"],
+          "properties": {
+            "phone": { "type": "string" },
+            "code": { "type": "string", "description": "6자리 숫자" },
+            "name": { "type": "string", "description": "선택. 처음 가입하는 번호일 때만 사용되고, 비우면 자동으로 이름이 지정된다." }
+          }
+        } } } },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": {
+            "type": "object",
+            "properties": { "token": { "type": "string", "description": "이후 인증이 필요한 요청의 Authorization: Bearer 값" }, "created": { "type": "boolean" }, "name": { "type": "string" } }
+          } } } },
+          "401": { "description": "인증번호가 틀렸거나 만료됨" },
+          "429": { "description": "시도 횟수 초과" }
+        }
+      }
+    },
+    "/api/public/{code}/my-reservations": {
+      "get": {
+        "operationId": "listMyReservations",
+        "summary": "내 예약 목록 조회 (최신순)",
+        "security": [{ "customerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ShopCode" }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Reservation" } } } } },
+          "401": { "description": "로그인 필요" }
+        }
+      }
+    },
+    "/api/public/{code}/reservations": {
+      "post": {
+        "operationId": "createReservation",
+        "summary": "예약 생성. 담당자를 지정하지 않으면 해당 시간에 가능한 직원 중 한 명이 자동 배정된다.",
+        "security": [{ "customerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ShopCode" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "required": ["startAt", "serviceIds"],
+          "properties": {
+            "startAt": { "type": "string", "description": "YYYY-MM-DDTHH:mm (availability 응답의 date + slots 중 하나를 조합)" },
+            "serviceIds": { "type": "array", "items": { "type": "integer" } },
+            "staffId": { "type": "integer", "description": "선택. 생략하면 자동 배정." }
+          }
+        } } } },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": {
+            "type": "object",
+            "properties": { "id": { "type": "integer" }, "endAt": { "type": "string" }, "staffId": { "type": "integer" }, "status": { "type": "string", "enum": ["pending", "confirmed"], "description": "매장 설정에 따라 확인필요(pending) 또는 확정(confirmed)" } }
+          } } } },
+          "400": { "description": "리드타임/최대예약일 위반, 잘못된 시술 등" },
+          "401": { "description": "로그인 필요" },
+          "403": { "description": "매장이 온라인 예약을 받지 않는 상태" },
+          "409": { "description": "해당 시간에 예약 가능한 담당자가 없음(충돌)" }
+        }
+      }
+    },
+    "/api/public/{code}/reservations/{id}/cancel": {
+      "post": {
+        "operationId": "cancelReservation",
+        "summary": "내 예약 취소",
+        "security": [{ "customerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ShopCode" }, { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "OK" }, "400": { "description": "이미 취소/완료되어 취소할 수 없음" }, "404": { "description": "본인 예약이 아니거나 존재하지 않음" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": { "customerAuth": { "type": "http", "scheme": "bearer", "description": "otp/verify 응답의 token 값" } },
+    "parameters": {
+      "ShopCode": { "name": "code", "in": "path", "required": true, "schema": { "type": "string" }, "description": "매장 공개 예약 코드 (설정 > 솔루션 간편설정의 예약 링크에서 확인)" }
+    },
+    "schemas": {
+      "Service": { "type": "object", "properties": { "id": { "type": "integer" }, "name": { "type": "string" }, "category": { "type": "string" }, "price": { "type": "integer" }, "duration_min": { "type": "integer" } } },
+      "Staff": { "type": "object", "properties": { "id": { "type": "integer" }, "name": { "type": "string" } } },
+      "BookingPolicy": { "type": "object", "properties": { "enabled": { "type": "boolean" }, "autoConfirm": { "type": "boolean" }, "minLeadMinutes": { "type": "integer" }, "maxDays": { "type": "integer" } } },
+      "Reservation": { "type": "object", "properties": { "id": { "type": "integer" }, "start_at": { "type": "string" }, "end_at": { "type": "string" }, "status": { "type": "string" }, "source": { "type": "string" }, "staff_name": { "type": "string" }, "items": { "type": "string" } } }
+    }
+  }
+}

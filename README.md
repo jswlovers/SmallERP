@@ -35,6 +35,8 @@ node test/ui-smoke.mjs      # 모든 탭/서브탭을 열어 콘솔 오류·빈 
 
 첫 화면에서 "신규 매장 등록"으로 매장과 사장 계정을 만들면 기본 시술 메뉴와 문자 템플릿이 생성됩니다.
 
+Claude나 ChatGPT로 예약을 받는 챗봇을 만들고 싶다면 [docs/llm-booking-integration.md](docs/llm-booking-integration.md)와 [docs/booking-api-openapi.json](docs/booking-api-openapi.json)을 참고하세요. 고객 온라인 예약 API(`/api/public/:code/...`)를 그대로 도구(tool)로 연결하면 됩니다.
+
 ## 구현 범위
 
 | 영역 | 구현 |
