@@ -16,7 +16,8 @@ process.env.SMS_LOG = '0';
 const db = openDb();
 const app = buildApp({ db });
 
-const ADMIN = { login: 'admin', password: 'admin12345!' };
+const ADMIN = { login: process.env.ADMIN_LOGIN || 'admin', password: process.env.ADMIN_PASSWORD || 'admin12345!' };
+const adminFromEnv = !!process.env.ADMIN_PASSWORD;
 // 이미 관리자가 있으면 비밀번호를 덮어쓰지 않는다(변경한 비밀번호 보호)
 const adminCreated = !db.prepare('SELECT 1 FROM admin_user WHERE login_id = ?').get(ADMIN.login);
 if (adminCreated) ensureAdmin(db, ADMIN.login, ADMIN.password);
@@ -74,5 +75,5 @@ if (!db.prepare('SELECT 1 FROM staff WHERE login_id = ?').get(TEST.loginId)) {
 
 console.log(created ? '테스트 매장/샘플 데이터를 생성했습니다.' : '테스트 매장이 이미 있어 건너뜁니다.');
 console.log(`\n  [매장]   http://localhost:${process.env.PORT || 3001}/            ${TEST.loginId} / ${TEST.password}`);
-console.log(`  [관리자] http://localhost:${process.env.PORT || 3001}/admin.html  ${ADMIN.login} / ${ADMIN.password}\n`);
+console.log(`  [관리자] http://localhost:${process.env.PORT || 3001}/admin.html  ${ADMIN.login} / ${adminFromEnv ? '(.env 의 ADMIN_PASSWORD)' : adminCreated ? ADMIN.password : '(이미 존재: 기존 비밀번호 유지)'}\n`);
 await app.close();

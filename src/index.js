@@ -28,6 +28,12 @@ const https = useHttps
     }
   : undefined;
 
+// 공개 인증서(도메인)로 서비스하거나 production 이면 코드에 공개된 기본 비밀키로는 시작하지 않는다.
+if ((process.env.NODE_ENV === 'production' || pub) && (!process.env.JWT_SECRET || !process.env.APP_KEY)) {
+  console.error('공개/운영 모드에서는 JWT_SECRET 과 APP_KEY 환경 변수를 반드시 설정해야 합니다. (.env.example 참고)');
+  process.exit(1);
+}
+
 const app = buildApp({ db, sms: mockProvider, logger: true, https });
 ensureAdmin(db);
 
