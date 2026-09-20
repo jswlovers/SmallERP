@@ -58,6 +58,7 @@ dialog::backdrop { background:rgba(0,0,0,.35); }
 .tt .ev { display:block; border-radius:4px; padding:2px 4px; margin:1px 0; background:#eceefe; color:var(--pri); cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .tt .ev.visited { background:#e3f6ed; color:var(--ok); } .tt .ev.noshow, .tt .ev.cancelled { background:#fdeaea; color:var(--danger); text-decoration:line-through; }
 .tt .ev.waiting { background:#fff4dd; color:#a26a00; } .tt .ev.in_service { background:#ddf0ff; color:#0a6fb5; } .tt .ev.naver { border-left:3px solid #03c75a; }
+.tt .ev.pub { border-left:3px solid var(--pri); }
 .tt .blk { background:repeating-linear-gradient(45deg,#f0f0f3,#f0f0f3 6px,#e6e7ec 6px,#e6e7ec 12px); color:var(--muted); }
 .cal { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
 .cal .d { border:1px solid var(--line); border-radius:8px; min-height:74px; padding:4px 6px; background:#fff; font-size:12px; }

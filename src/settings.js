@@ -17,4 +17,6 @@ export const DEFAULT_SETTINGS = {
   point_use: { min: 1000 },
   reservation: { unit: 30, completeOn: 'payment', openTime: '09:00', closeTime: '21:00' },
   owner_phone: '',
+  // 고객 셀프 온라인 예약(전화번호 인증 가입) 화면 설정
+  public_booking: { enabled: true, autoConfirm: false, minLeadMinutes: 60, maxDays: 30 },
 };

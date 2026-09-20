@@ -1,5 +1,5 @@
 import { tx } from '../db.js';
-import { hashPassword, verifyPassword } from '../crypto.js';
+import { genShopCode, hashPassword, verifyPassword } from '../crypto.js';
 import { HttpError, bad, required } from '../util.js';
 import { audit } from '../audit.js';
 
@@ -21,7 +21,9 @@ export default function (app, { db }) {
     required(req.body, 'shopName', 'ownerName', 'loginId', 'password');
     if (String(password).length < 8) throw bad('비밀번호는 8자 이상이어야 합니다.');
     const staff = tx(db, () => {
-      const shopId = Number(db.prepare('INSERT INTO shop(name, sms_balance) VALUES (?, 1000)').run(shopName).lastInsertRowid);
+      let code;
+      do { code = genShopCode(); } while (db.prepare('SELECT 1 FROM shop WHERE public_code = ?').get(code));
+      const shopId = Number(db.prepare('INSERT INTO shop(name, sms_balance, public_code) VALUES (?, 1000, ?)').run(shopName, code).lastInsertRowid);
       const sid = Number(
         db
           .prepare("INSERT INTO staff(shop_id, name, login_id, password_hash, role) VALUES (?,?,?,?, 'owner')")
@@ -74,7 +76,7 @@ export default function (app, { db }) {
 
   app.get('/api/me', async (req) => {
     const s = db.prepare('SELECT id, name, role, shop_id FROM staff WHERE id = ?').get(req.user.sid);
-    const shop = db.prepare('SELECT id, name, plan, sms_balance FROM shop WHERE id = ?').get(req.user.shop);
+    const shop = db.prepare('SELECT id, name, plan, sms_balance, public_code FROM shop WHERE id = ?').get(req.user.shop);
     return { staff: s, shop };
   });
 }

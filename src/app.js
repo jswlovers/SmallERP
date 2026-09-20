@@ -20,6 +20,7 @@ import walletRoutes from './routes/wallet.js';
 import scheduleRoutes from './routes/schedule.js';
 import opsRoutes from './routes/ops.js';
 import insightRoutes from './routes/insight.js';
+import publicRoutes from './routes/public.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -40,7 +41,7 @@ export function buildApp({ db = openDb(), sms = mockProvider, logger = false, ht
 
   // /api/auth/* 를 제외한 모든 API는 JWT 필요. req.user = { sid(staff), shop, role }
   app.addHook('onRequest', async (req) => {
-    if (!req.url.startsWith('/api/') || req.url.startsWith('/api/auth/') || req.url.startsWith('/api/webhooks/') || req.url.startsWith('/api/admin/') || req.url === '/api/health') return;
+    if (!req.url.startsWith('/api/') || req.url.startsWith('/api/auth/') || req.url.startsWith('/api/webhooks/') || req.url.startsWith('/api/admin/') || req.url.startsWith('/api/public/') || req.url === '/api/health') return;
     try {
       await req.jwtVerify();
     } catch {
@@ -65,7 +66,7 @@ export function buildApp({ db = openDb(), sms = mockProvider, logger = false, ht
 
   app.get('/api/health', async () => ({ ok: true }));
 
-  for (const r of [authRoutes, staffRoutes, customerRoutes, serviceRoutes, reservationRoutes, paymentRoutes, statsRoutes, messageRoutes, adminRoutes, catalogRoutes, walletRoutes, scheduleRoutes, opsRoutes, insightRoutes]) {
+  for (const r of [authRoutes, staffRoutes, customerRoutes, serviceRoutes, reservationRoutes, paymentRoutes, statsRoutes, messageRoutes, adminRoutes, catalogRoutes, walletRoutes, scheduleRoutes, opsRoutes, insightRoutes, publicRoutes]) {
     r(app, ctx);
   }
 

@@ -10,28 +10,70 @@ import { nextCustomerNo } from './customers.js';
 const STATUSES = ['pending', 'confirmed', 'waiting', 'in_service', 'visited', 'noshow', 'cancelled'];
 const NOSHOW_FLAG_AT = 3; // 노쇼 누적 N회 이상이면 고객에 주의 표시
 
+/** 시술 ID 목록 → 항목/총 소요시간 */
+export function resolveServices(db, shop, serviceIds) {
+  if (!Array.isArray(serviceIds) || !serviceIds.length) throw bad('시술을 1개 이상 선택하세요.');
+  const items = serviceIds.map((id) => {
+    const s = db.prepare('SELECT * FROM service WHERE id = ? AND shop_id = ? AND active = 1').get(id, shop);
+    if (!s) throw notFound('시술');
+    return s;
+  });
+  return { items, minutes: items.reduce((a, s) => a + s.duration_min, 0) };
+}
+
+export function assertStaff(db, shop, staffId) {
+  if (!db.prepare('SELECT 1 FROM staff WHERE id = ? AND shop_id = ? AND active = 1').get(staffId, shop)) throw notFound('직원');
+}
+
+export function custOrThrow(db, shop, id) {
+  const c = db.prepare('SELECT * FROM customer WHERE id = ? AND shop_id = ? AND deleted_at IS NULL').get(id, shop);
+  if (!c) throw notFound('고객');
+  return c;
+}
+
+export async function notifyStaff(ctx, shop, resv, customer) {
+  const st = ctx.db.prepare('SELECT * FROM staff WHERE id = ?').get(resv.staff_id);
+  if (st?.phone_enc)
+    await fire(ctx, shop, 'staff_notify', staffRecipient(st), { customer: customer.name, date: resv.start_at.slice(0, 10), time: resv.start_at.slice(11) }, `sn${resv.id}`);
+}
+
+/**
+ * 예약 생성 공통 로직. staffId 를 생략하면 해당 시간에 가능한 담당자를 자동 배정한다(고객 셀프 예약용).
+ * status: 'confirmed' | 'pending' | 'waiting'. source: 'internal' | 'naver' | 'public'.
+ */
+export async function bookReservation(ctx, shop, { customerId, staffId, startAt, serviceIds, status = 'confirmed', source = 'internal', memo = '' }) {
+  const { db } = ctx;
+  const cust = custOrThrow(db, shop, customerId);
+  const { items, minutes } = resolveServices(db, shop, serviceIds);
+  const end = addMinutes(startAt, minutes);
+  const result = tx(db, () => {
+    let sid = staffId;
+    if (sid) {
+      assertStaff(db, shop, sid);
+      const why = checkAvailability(db, shop, sid, startAt, end);
+      if (why) throw new HttpError(409, why);
+    } else {
+      const candidates = db.prepare('SELECT id FROM staff WHERE shop_id = ? AND active = 1 ORDER BY id').all(shop).map((r) => r.id);
+      sid = candidates.find((id) => !checkAvailability(db, shop, id, startAt, end));
+      if (!sid) throw new HttpError(409, '선택하신 시간에 예약 가능한 담당자가 없습니다.');
+    }
+    const id = Number(
+      db.prepare('INSERT INTO reservation(shop_id, customer_id, staff_id, start_at, end_at, status, source, memo) VALUES (?,?,?,?,?,?,?,?)')
+        .run(shop, customerId, sid, startAt, end, status, source, memo).lastInsertRowid,
+    );
+    const ins = db.prepare('INSERT INTO reservation_item(reservation_id, service_id, price) VALUES (?,?,?)');
+    for (const s of items) ins.run(id, s.id, s.price);
+    return { id, endAt: end, staffId: sid };
+  });
+  const resv = db.prepare('SELECT * FROM reservation WHERE id = ?').get(result.id);
+  const vars = { date: startAt.slice(0, 10), time: startAt.slice(11) };
+  await fire(ctx, shop, status === 'pending' ? 'reservation_pending' : 'reservation_created', cust, vars, `r${result.id}`);
+  await notifyStaff(ctx, shop, resv, cust);
+  return { ...result, status };
+}
+
 export default function (app, ctx) {
   const { db } = ctx;
-
-  /** 시술 ID 목록 → 항목/총 소요시간 */
-  const resolveServices = (shop, serviceIds) => {
-    if (!Array.isArray(serviceIds) || !serviceIds.length) throw bad('시술을 1개 이상 선택하세요.');
-    const items = serviceIds.map((id) => {
-      const s = db.prepare('SELECT * FROM service WHERE id = ? AND shop_id = ? AND active = 1').get(id, shop);
-      if (!s) throw notFound('시술');
-      return s;
-    });
-    return { items, minutes: items.reduce((a, s) => a + s.duration_min, 0) };
-  };
-
-  const assertStaff = (shop, staffId) => {
-    if (!db.prepare('SELECT 1 FROM staff WHERE id = ? AND shop_id = ? AND active = 1').get(staffId, shop)) throw notFound('직원');
-  };
-  const getCustomer = (shop, id) => {
-    const c = db.prepare('SELECT * FROM customer WHERE id = ? AND shop_id = ? AND deleted_at IS NULL').get(id, shop);
-    if (!c) throw notFound('고객');
-    return c;
-  };
 
   const detail = (shop, where, ...params) =>
     db
@@ -44,12 +86,6 @@ export default function (app, ctx) {
       )
       .all(shop, ...params);
 
-  const notifyStaff = async (shop, resv, customer) => {
-    const st = db.prepare('SELECT * FROM staff WHERE id = ?').get(resv.staff_id);
-    if (st?.phone_enc)
-      await fire(ctx, shop, 'staff_notify', staffRecipient(st), { customer: customer.name, date: resv.start_at.slice(0, 10), time: resv.start_at.slice(11) }, `sn${resv.id}`);
-  };
-
   app.get('/api/reservations', async (req) => {
     const { from, to, staffId } = req.query;
     if (!from || !to) throw bad('from, to(YYYY-MM-DD)가 필요합니다.');
@@ -61,28 +97,8 @@ export default function (app, ctx) {
     required(b, 'customerId', 'staffId', 'startAt', 'serviceIds');
     const shop = req.user.shop;
     const start = dt(b.startAt, 'startAt');
-    const cust = getCustomer(shop, b.customerId);
-    assertStaff(shop, b.staffId);
-    const { items, minutes } = resolveServices(shop, b.serviceIds);
-    const end = addMinutes(start, minutes);
     const status = b.status && ['confirmed', 'pending', 'waiting'].includes(b.status) ? b.status : 'confirmed';
-    const out = tx(db, () => {
-      const why = checkAvailability(db, shop, b.staffId, start, end);
-      if (why) throw new HttpError(409, why);
-      const id = Number(
-        db
-          .prepare('INSERT INTO reservation(shop_id, customer_id, staff_id, start_at, end_at, status, memo) VALUES (?,?,?,?,?,?,?)')
-          .run(shop, b.customerId, b.staffId, start, end, status, b.memo ?? '').lastInsertRowid,
-      );
-      const ins = db.prepare('INSERT INTO reservation_item(reservation_id, service_id, price) VALUES (?,?,?)');
-      for (const s of items) ins.run(id, s.id, s.price);
-      return { id, endAt: end };
-    });
-    const resv = db.prepare('SELECT * FROM reservation WHERE id = ?').get(out.id);
-    const vars = { date: start.slice(0, 10), time: start.slice(11) };
-    await fire(ctx, shop, status === 'pending' ? 'reservation_pending' : 'reservation_created', cust, vars, `r${out.id}`);
-    await notifyStaff(shop, resv, cust);
-    return out;
+    return bookReservation(ctx, shop, { customerId: b.customerId, staffId: b.staffId, startAt: start, serviceIds: b.serviceIds, status, source: 'internal', memo: b.memo ?? '' });
   });
 
   app.patch('/api/reservations/:id', async (req) => {
@@ -92,13 +108,13 @@ export default function (app, ctx) {
     const b = req.body ?? {};
     if (b.status && !STATUSES.includes(b.status)) throw bad('올바르지 않은 상태입니다.');
     const staffId = b.staffId ?? cur.staff_id;
-    if (b.staffId) assertStaff(shop, staffId);
+    if (b.staffId) assertStaff(db, shop, staffId);
     const start = b.startAt ? dt(b.startAt, 'startAt') : cur.start_at;
     const out = tx(db, () => {
       let end = cur.end_at;
       const timeChanged = b.startAt || b.serviceIds || b.staffId;
       if (b.serviceIds) {
-        const { items, minutes } = resolveServices(shop, b.serviceIds);
+        const { items, minutes } = resolveServices(db, shop, b.serviceIds);
         end = addMinutes(start, minutes);
         db.prepare('DELETE FROM reservation_item WHERE reservation_id = ?').run(cur.id);
         const ins = db.prepare('INSERT INTO reservation_item(reservation_id, service_id, price) VALUES (?,?,?)');
@@ -162,7 +178,7 @@ export default function (app, ctx) {
       const cust = db.prepare('SELECT * FROM customer WHERE id = ?').get(out.customerId);
       await fire(ctx, shop, 'naver_reservation', cust, { date: start.slice(0, 10), time: start.slice(11) }, `r${out.id}`);
       const resv = db.prepare('SELECT * FROM reservation WHERE id = ?').get(out.id);
-      await notifyStaff(shop, resv, cust);
+      await notifyStaff(ctx, shop, resv, cust);
     }
     return out;
   });

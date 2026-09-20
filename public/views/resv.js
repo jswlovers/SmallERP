@@ -65,7 +65,7 @@ async function dayList(el, redraw) {
       <tr><th>시간</th><th>고객</th><th>시술</th><th>담당</th><th>상태</th><th></th></tr>
       ${list.map((r) => html`<tr>
         <td>${r.start_at.slice(11)}~${r.end_at.slice(11)}</td>
-        <td>${r.customer_name}${r.customer_noshow ? raw(' <span class="flag" title="노쇼 주의 고객">⚠</span>') : ''}${r.source === 'naver' ? raw(' <span class="badge">네이버</span>') : ''}</td>
+        <td>${r.customer_name}${r.customer_noshow ? raw(' <span class="flag" title="노쇼 주의 고객">⚠</span>') : ''}${r.source === 'naver' ? raw(' <span class="badge">네이버</span>') : ''}${r.source === 'public' ? raw(' <span class="badge">고객예약</span>') : ''}</td>
         <td>${r.items}<div class="muted">${won(r.total)}</div></td><td>${r.staff_name}</td>
         <td><span class="badge ${r.status}">${STATUS[r.status]}</span>${r.memo ? html`<div class="muted">${r.memo}</div>` : ''}</td>
         <td>${statusButtons(r)}</td></tr>`)}
@@ -119,7 +119,7 @@ async function timetable(el, redraw) {
   const covered = new Set();
   const cell = (c, t) => {
     const startsHere = resv.filter((r) => r.staff_id === c.staffId && r.start_at.slice(0, 10) === c.date && toMin(r.start_at.slice(11)) >= toMin(t) && toMin(r.start_at.slice(11)) < toMin(t) + step);
-    const evs = startsHere.map((r) => { for (let x = toMin(t) + step; x < toMin(r.end_at.slice(11)); x += step) covered.add(`${c.staffId}|${c.date}|${hhmm(x)}`); return html`<span class="ev ${r.status} ${r.source === 'naver' ? 'naver' : ''}" data-ev="${r.id}">${r.start_at.slice(11)} ${r.customer_name} ${r.items ?? ''}</span>`; });
+    const evs = startsHere.map((r) => { for (let x = toMin(t) + step; x < toMin(r.end_at.slice(11)); x += step) covered.add(`${c.staffId}|${c.date}|${hhmm(x)}`); return html`<span class="ev ${r.status} ${r.source === 'naver' ? 'naver' : ''} ${r.source === 'public' ? 'pub' : ''}" data-ev="${r.id}">${r.start_at.slice(11)} ${r.customer_name} ${r.items ?? ''}</span>`; });
     const why = blockedReason(c, t);
     if (evs.length) return html`<td>${evs}</td>`;
     if (covered.has(`${c.staffId}|${c.date}|${t}`)) return html`<td style="background:#f3f4ff"></td>`;

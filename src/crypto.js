@@ -27,6 +27,12 @@ export const phoneHash = (phone) => {
   return n ? createHmac('sha256', key).update(n).digest('hex') : null;
 };
 
+/** OTP(문자 인증번호) 저장용 해시. 평문 코드를 DB에 남기지 않는다. */
+export const hashOtp = (code) => createHmac('sha256', key).update(`otp:${code}`).digest('hex');
+
+/** 매장 공개 예약 링크용 코드 (URL-safe, 추측 방지를 위해 충분히 길게) */
+export const genShopCode = () => randomBytes(6).toString('base64url');
+
 export function hashPassword(pw) {
   const salt = randomBytes(16);
   return `${salt.toString('hex')}:${scryptSync(pw, salt, 64).toString('hex')}`;

@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { genShopCode } from './crypto.js';
 
 // 날짜/시간은 매장 로컬 기준 'YYYY-MM-DDTHH:mm' 문자열로 저장한다(사전순 비교 가능).
 const SCHEMA = `
@@ -355,6 +356,17 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ux_msg_dedupe ON message_log(rule_id, customer_id, ref_key) WHERE rule_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS otp_code (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  shop_id INTEGER NOT NULL,
+  phone_hash TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS ix_otp_lookup ON otp_code(shop_id, phone_hash, created_at);
 `;
 
 export function openDb(file = process.env.DB_FILE || 'data/smallerp.db') {
@@ -387,7 +399,20 @@ function migrate(db) {
   add('payment_item', 'goods_id', 'INTEGER');
   add('payment_item', 'qty', 'INTEGER NOT NULL DEFAULT 1');
   add('message_log', 'staff_id', 'INTEGER');
+  add('shop', 'public_code', 'TEXT');
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ux_customer_no ON customer(shop_id, no) WHERE no IS NOT NULL');
+
+  // 고객 온라인 예약 링크 코드가 없는 매장(기존 DB)에는 새로 발급한다.
+  const noCode = db.prepare('SELECT id FROM shop WHERE public_code IS NULL').all();
+  if (noCode.length) {
+    const taken = db.prepare('UPDATE shop SET public_code = ? WHERE id = ?');
+    for (const { id } of noCode) {
+      let code;
+      do { code = genShopCode(); } while (db.prepare('SELECT 1 FROM shop WHERE public_code = ?').get(code));
+      taken.run(code, id);
+    }
+  }
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ux_shop_public_code ON shop(public_code)');
 }
 
 /** 트랜잭션 헬퍼: 예외 시 롤백 */
