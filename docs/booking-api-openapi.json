@@ -103,14 +103,14 @@
     "/api/public/{code}/reservations": {
       "post": {
         "operationId": "createReservation",
-        "summary": "예약 생성. 인증 필요. 담당자를 지정하지 않으면 해당 시간에 가능한 직원 중 한 명이 자동 배정된다.",
+        "summary": "예약 생성. 인증 필요. staffId는 필수이며 자동 배정은 지원하지 않는다 — 호출 전 반드시 담당 디자이너를 확인해서 넣어야 한다.",
         "parameters": [{ "$ref": "#/components/parameters/ShopCode" }, { "$ref": "#/components/parameters/AuthHeader" }],
         "requestBody": { "required": true, "content": { "application/json": { "schema": {
-          "type": "object", "required": ["startAt", "serviceIds"],
+          "type": "object", "required": ["startAt", "serviceIds", "staffId"],
           "properties": {
             "startAt": { "type": "string", "description": "YYYY-MM-DDTHH:mm (availability 응답의 date + slots 중 하나를 조합)" },
             "serviceIds": { "type": "array", "items": { "type": "integer" } },
-            "staffId": { "type": "integer", "description": "선택. 생략하면 자동 배정." }
+            "staffId": { "type": "integer", "description": "필수. getShopInfo로 확인한 담당 디자이너의 ID. 생략하면 400 오류." }
           }
         } } } },
         "responses": {

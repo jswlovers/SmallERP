@@ -24,9 +24,9 @@ const TOOLS = [
     type: 'object', required: ['phone', 'code'], properties: { phone: { type: 'string' }, code: { type: 'string' }, name: { type: 'string', description: '선택: 신규 고객일 때만 사용됨' } },
   } },
   { name: 'listMyReservations', description: '인증된 고객 본인의 예약 목록을 조회한다.', input_schema: { type: 'object', properties: {} } },
-  { name: 'createReservation', description: '예약을 생성한다. 인증된 고객만 가능하다. 담당자를 지정하지 않으면 그 시간에 가능한 직원이 자동 배정된다.', input_schema: {
-    type: 'object', required: ['startAt', 'serviceIds'],
-    properties: { startAt: { type: 'string', description: 'YYYY-MM-DDTHH:mm' }, serviceIds: { type: 'array', items: { type: 'integer' } }, staffId: { type: 'integer' } },
+  { name: 'createReservation', description: '예약을 생성한다. 인증된 고객만 가능하다. staffId는 필수이며 자동 배정은 지원하지 않는다 — 호출 전 반드시 고객에게 담당 디자이너를 확인해 그 사람의 staffId를 넣어라.', input_schema: {
+    type: 'object', required: ['startAt', 'serviceIds', 'staffId'],
+    properties: { startAt: { type: 'string', description: 'YYYY-MM-DDTHH:mm' }, serviceIds: { type: 'array', items: { type: 'integer' } }, staffId: { type: 'integer', description: 'getShopInfo로 확인한 담당 디자이너의 ID. 필수.' } },
   } },
   { name: 'cancelReservation', description: '인증된 고객 본인의 예약을 취소한다.', input_schema: { type: 'object', required: ['id'], properties: { id: { type: 'integer' } } } },
 ];
@@ -40,6 +40,7 @@ function systemPrompt(shop, session) {
 규칙:
 - 고객이 "내일", "이번 주 토요일", "9월 23일"처럼 연도를 말하지 않거나 상대적인 날짜를 말하면, 반드시 위 현재 시각을 기준으로 정확한 연도(YYYY)까지 계산해서 getAvailability/createReservation에 넘기세요. 절대 임의의 연도를 추측하지 마세요.
 - 예약하려는 시술과 원하는 날짜를 먼저 확인하고, getAvailability로 실제 가능한 시간을 확인한 뒤 안내하세요. 시간을 지어내지 마세요.
+- 담당 디자이너는 반드시 지정해야 합니다(자동 배정 없음). createReservation을 호출하기 전에 고객에게 원하는 디자이너를 물어보세요. 고객이 "아무나 상관없다"고 하면, getShopInfo의 직원 목록 중 해당 시간에 가능한 한 명을 당신이 골라 이름으로 제안하고 동의를 받은 뒤 그 사람의 staffId로 예약하세요 — staffId 없이 호출하지 마세요.
 - 시술 ID·담당자 ID 같은 내부 값은 고객에게 보여주지 말고 이름으로만 이야기하세요.
 - createReservation·listMyReservations·cancelReservation은 반드시 인증(로그인)된 뒤에만 호출할 수 있습니다.
 - 도구가 오류를 반환하면 그 오류 문구를 그대로 고객에게 전하지 말고, 원인을 파악해 자연스럽게 안내하거나 필요한 정보를 다시 물어보세요.

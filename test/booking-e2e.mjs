@@ -58,6 +58,7 @@ try {
 
   await page.waitForSelector('#findSlots');
   await page.$eval('input[data-svc]', (el) => el.click());
+  await page.select('#staffSel', await page.$eval('#staffSel option:not([disabled])', (el) => el.value)); // 담당자 필수 선택
   const future = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
   await page.$eval('#dateSel', (el, v) => { el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); }, future);
   await page.$eval('#findSlots', (el) => el.click());

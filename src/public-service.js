@@ -135,8 +135,9 @@ export function listMyReservations(db, shop, customerId) {
     .all(shop.id, customerId);
 }
 
+// 온라인 예약(폼/AI 챗봇 공통)은 반드시 담당 디자이너를 지정해야 한다 — 자동 배정 없음.
 export async function createReservation(ctx, shop, customerId, { startAt, serviceIds, staffId }) {
-  required({ startAt, serviceIds }, 'startAt', 'serviceIds');
+  required({ startAt, serviceIds, staffId }, 'startAt', 'serviceIds', 'staffId');
   const booking = getSetting(ctx.db, shop.id, 'public_booking', DEFAULT_SETTINGS.public_booking);
   if (!booking.enabled) throw new HttpError(403, '지금은 온라인 예약을 받지 않는 매장입니다. 전화로 문의해 주세요.');
   const start = dt(startAt, 'startAt');
@@ -146,7 +147,7 @@ export async function createReservation(ctx, shop, customerId, { startAt, servic
   if (start.slice(0, 10) > addDays(todayLocal(), booking.maxDays)) throw bad(`예약은 최대 ${booking.maxDays}일 이내만 가능합니다.`);
   const status = booking.autoConfirm ? 'confirmed' : 'pending';
   return bookReservation(ctx, shop.id, {
-    customerId, staffId: staffId ? Number(staffId) : undefined, startAt: start, serviceIds,
+    customerId, staffId: Number(staffId), startAt: start, serviceIds,
     status, source: 'public', memo: '고객 온라인 예약',
   });
 }

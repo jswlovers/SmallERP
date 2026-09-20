@@ -10,7 +10,7 @@ import { addDays, todayLocal } from '../src/util.js';
 
 process.env.SMS_LOG = '0';
 
-let db, app, tk, shop, cutId;
+let db, app, tk, shop, cutId, ownerId;
 const call = async (method, url, body, token = tk) => {
   const res = await app.inject({ method, url, payload: body, headers: token ? { authorization: `Bearer ${token}` } : {} });
   const ct = res.headers['content-type'] ?? '';
@@ -23,6 +23,7 @@ before(async () => {
   tk = (await call('POST', '/api/auth/register', { shopName: 'AI테스트샵', ownerName: '사장', loginId: 'aiag', password: 'password123' }, null)).body.token;
   const me = (await call('GET', '/api/me')).body;
   shop = db.prepare('SELECT * FROM shop WHERE id = ?').get(me.shop.id);
+  ownerId = me.staff.id;
   cutId = (await call('GET', '/api/services')).body.find((s) => s.name === '커트').id;
 });
 
@@ -51,7 +52,7 @@ test('전체 흐름: 정보조회→시간조회→인증→예약생성까지 �
     () => toolUse('t2', 'getAvailability', { date, serviceIds: [cutId] }),
     (msgs) => { [slot] = lastToolResults(msgs)[0].slots; return toolUse('t3', 'requestOtp', { phone: '010-7100-0001' }); },
     (msgs) => { devCode = lastToolResults(msgs)[0].devCode; return toolUse('t4', 'verifyOtp', { phone: '010-7100-0001', code: devCode, name: 'AI고객' }); },
-    () => toolUse('t5', 'createReservation', { startAt: `${date}T${slot}`, serviceIds: [cutId] }),
+    () => toolUse('t5', 'createReservation', { startAt: `${date}T${slot}`, serviceIds: [cutId], staffId: ownerId }),
     () => finalText('예약이 접수되었습니다!'),
   ];
   let i = 0;

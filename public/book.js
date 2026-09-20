@@ -90,7 +90,7 @@ function bookingForm() {
     <label>시술 선택 (복수 선택 가능)</label>
     ${info.services.length ? info.services.map((s) => html`<label class="svcopt"><input type="checkbox" data-svc="${s.id}" ${picked.serviceIds.has(s.id) ? raw('checked') : ''}>
         <span style="flex:1">${s.category ? `[${s.category}] ` : ''}${s.name}</span><span class="muted">${won(s.price)} · ${s.duration_min}분</span></label>`) : html`<p class="muted">예약 가능한 시술이 없습니다.</p>`}
-    <div class="row" style="margin-top:10px"><label>담당자<select id="staffSel"><option value="">담당자 무관(자동 배정)</option>${info.staff.map((s) => html`<option value="${s.id}" ${String(s.id) === picked.staffId ? raw('selected') : ''}>${s.name}</option>`)}</select></label>
+    <div class="row" style="margin-top:10px"><label>담당자 (필수)<select id="staffSel" required><option value="" disabled ${picked.staffId ? '' : raw('selected')}>담당자를 선택하세요</option>${info.staff.map((s) => html`<option value="${s.id}" ${String(s.id) === picked.staffId ? raw('selected') : ''}>${s.name}</option>`)}</select></label>
       <label>날짜<input type="date" id="dateSel" value="${picked.date}" min="${ymd()}" max="${maxDate}"></label></div>
     <p><button type="button" class="sec" id="findSlots">가능한 시간 보기</button></p>
     <div id="slots"></div>
@@ -107,8 +107,8 @@ function bindBookingForm() {
   };
   $('#findSlots').onclick = guard(async () => {
     if (!picked.serviceIds.size) throw new Error('시술을 1개 이상 선택해 주세요.');
-    const q = new URLSearchParams({ date: picked.date, serviceIds: [...picked.serviceIds].join(',') });
-    if (picked.staffId) q.set('staffId', picked.staffId);
+    if (!picked.staffId) throw new Error('담당자를 선택해 주세요.');
+    const q = new URLSearchParams({ date: picked.date, serviceIds: [...picked.serviceIds].join(','), staffId: picked.staffId });
     const r = await get(`/api/public/${code}/availability?${q}`);
     $('#slots').innerHTML = r.slots.length
       ? html`<div class="slotwrap">${r.slots.map((t) => html`<span class="slot ${t === picked.time ? 'on' : ''}" data-t="${t}">${t}</span>`)}</div>`.s
@@ -121,9 +121,8 @@ function bindBookingForm() {
     };
   });
   $('#submitResv').onclick = guard(async () => {
-    if (!picked.time) return;
-    const body = { startAt: `${picked.date}T${picked.time}`, serviceIds: [...picked.serviceIds] };
-    if (picked.staffId) body.staffId = +picked.staffId;
+    if (!picked.time || !picked.staffId) return;
+    const body = { startAt: `${picked.date}T${picked.time}`, serviceIds: [...picked.serviceIds], staffId: +picked.staffId };
     const r = await post(`/api/public/${code}/reservations`, body);
     toast(r.status === 'confirmed' ? '예약이 확정되었습니다!' : '예약을 접수했습니다. 매장에서 확인 후 확정됩니다.');
     picked = { serviceIds: new Set(), staffId: '', date: ymd(), time: '' };

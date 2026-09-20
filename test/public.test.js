@@ -103,15 +103,24 @@ test('직원/관리자 토큰으로는 고객 공개 API를 쓸 수 없고, 고�
   assert.equal((await call('GET', '/api/customers', null, token)).status, 401);
 });
 
-test('빈 시간 조회 → 예약 생성(담당자 지정/자동 배정) → 정책상 확인필요 상태 → 내 예약에 표시', async () => {
+test('예약 생성 시 담당자는 필수다(자동 배정 없음)', async () => {
+  const r = await requestOtp('010-5900-0001');
+  const { token } = (await verifyOtp('010-5900-0001', r.body.devCode, '담당자테스트')).body;
+  const date = addDays(todayLocal(), 3);
+  const noStaff = await call('POST', `/api/public/${code}/reservations`, { startAt: `${date}T11:00`, serviceIds: [svc['커트'].id] }, token);
+  assert.equal(noStaff.status, 400);
+  assert.match(noStaff.body.error, /staffId/);
+});
+
+test('빈 시간 조회 → 담당자 지정 예약 생성 → 정책상 확인필요 상태 → 내 예약에 표시', async () => {
   const r = await requestOtp('010-6000-0001');
   const { token } = (await verifyOtp('010-6000-0001', r.body.devCode, '예약고객')).body;
   const date = addDays(todayLocal(), 3);
-  const avail = await call('GET', `/api/public/${code}/availability?date=${date}&serviceIds=${svc['커트'].id}`);
+  const avail = await call('GET', `/api/public/${code}/availability?date=${date}&serviceIds=${svc['커트'].id}&staffId=${owner}`);
   assert.equal(avail.status, 200);
   assert.ok(avail.body.slots.length > 0);
   const slot = avail.body.slots[0];
-  const created = await call('POST', `/api/public/${code}/reservations`, { startAt: `${date}T${slot}`, serviceIds: [svc['커트'].id] }, token);
+  const created = await call('POST', `/api/public/${code}/reservations`, { staffId: owner, startAt: `${date}T${slot}`, serviceIds: [svc['커트'].id] }, token);
   assert.equal(created.status, 200);
   assert.equal(created.body.status, 'pending'); // autoConfirm=false 기본값
   const mine = await call('GET', `/api/public/${code}/my-reservations`, null, token);
@@ -128,17 +137,17 @@ test('예약 최소 리드타임/최대 기간을 벗어나면 거부된다', as
   const soon = new Date(Date.now() + 5 * 60000); // 5분 뒤 (기본 최소 60분보다 이름)
   const p2 = (n) => String(n).padStart(2, '0');
   const startAt = `${soon.getFullYear()}-${p2(soon.getMonth() + 1)}-${p2(soon.getDate())}T${p2(soon.getHours())}:${p2(soon.getMinutes())}`;
-  const tooSoon = await call('POST', `/api/public/${code}/reservations`, { startAt, serviceIds: [svc['커트'].id] }, token);
+  const tooSoon = await call('POST', `/api/public/${code}/reservations`, { staffId: owner, startAt, serviceIds: [svc['커트'].id] }, token);
   assert.equal(tooSoon.status, 400);
   assert.match(tooSoon.body.error, /최소 60분 전/); // "이미 지난 시간"과는 다른 문구여야 함(아직 미래이지만 너무 임박)
-  const tooFar = await call('POST', `/api/public/${code}/reservations`, { startAt: `${addDays(todayLocal(), 60)}T10:00`, serviceIds: [svc['커트'].id] }, token);
+  const tooFar = await call('POST', `/api/public/${code}/reservations`, { staffId: owner, startAt: `${addDays(todayLocal(), 60)}T10:00`, serviceIds: [svc['커트'].id] }, token);
   assert.equal(tooFar.status, 400);
 });
 
 test('연도를 잘못 계산해 과거 날짜로 예약을 시도하면 "지난 시간"이라고 분명히 알려준다(AI가 원인을 바로 알 수 있도록)', async () => {
   const r = await requestOtp('010-6150-0001');
   const { token } = (await verifyOtp('010-6150-0001', r.body.devCode, '작년착각')).body;
-  const past = await call('POST', `/api/public/${code}/reservations`, { startAt: '2020-01-01T10:00', serviceIds: [svc['커트'].id] }, token);
+  const past = await call('POST', `/api/public/${code}/reservations`, { staffId: owner, startAt: '2020-01-01T10:00', serviceIds: [svc['커트'].id] }, token);
   assert.equal(past.status, 400);
   assert.match(past.body.error, /이미 지난 시간/);
   assert.doesNotMatch(past.body.error, /최소 60분 전/); // "너무 임박함"과 혼동되지 않아야 함
