@@ -78,7 +78,11 @@ try {
   assert.match(await bodyText(), new RegExp(`${amount.toLocaleString('ko-KR')}원`));
   await tab('결제'); assert.match(await bodyText(), /김고객/);
   await tab('문자'); assert.match(await bodyText(), /생일 축하/);
-  await tab('설정'); assert.match(await bodyText(), /커트/);
+  await tab('상품'); assert.match(await bodyText(), /커트/);
+  await tab('설정'); assert.match(await bodyText(), /솔루션 간편설정|고객번호/);
+  await tab('입출금'); assert.match(await bodyText(), /입출금 등록/);
+  await tab('매장'); assert.match(await bodyText(), /출퇴근/);
+  await tab('대기'); assert.match(await bodyText(), /대기 접수/);
   await tab('대시보드'); assert.match(await bodyText(), /오늘 매출/);
   await page.screenshot({ path: process.env.SHOT || 'data/e2e.png' });
   assert.deepEqual(errors, []);

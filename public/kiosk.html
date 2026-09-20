@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>셀프 접수 키오스크</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%235b5bd6'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<style>
+  body { background:#f5f6f8; }
+  #k { max-width:720px; margin:0 auto; padding:24px 16px; text-align:center; }
+  #k h1 { font-size:30px; margin:8px 0 20px; }
+  .kbtn { display:block; width:100%; padding:26px; margin:12px 0; font-size:24px; border:0; border-radius:16px; cursor:pointer; background:var(--pri); color:#fff; }
+  .kbtn.sec { background:#eceefe; color:var(--pri); }
+  .pad { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:14px 0; }
+  .pad button { padding:22px; font-size:26px; border:1px solid var(--line); background:#fff; border-radius:12px; cursor:pointer; }
+  #disp { font-size:34px; letter-spacing:2px; min-height:48px; padding:8px; background:#fff; border:1px solid var(--line); border-radius:12px; }
+  .opt { display:inline-block; padding:16px 22px; margin:6px; font-size:20px; border:2px solid var(--line); border-radius:12px; background:#fff; cursor:pointer; }
+  .opt.on { border-color:var(--pri); color:var(--pri); }
+  .num { font-size:96px; font-weight:700; color:var(--pri); margin:10px 0; }
+</style>
+</head>
+<body>
+<div id="k"></div>
+<div id="toast"></div>
+<dialog id="modal"><div id="modalBody"></div></dialog>
+<script type="module" src="kiosk.js"></script>
+</body>
+</html>
