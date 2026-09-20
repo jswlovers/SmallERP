@@ -48,8 +48,8 @@ test('휴대폰 인증만으로 가입/로그인: OTP 요청→검증→토큰 �
   assert.match(req1.body.devCode, /^\d{6}$/);
   // 60초 이내 재요청은 429
   assert.equal((await requestOtp('010-2000-0001')).status, 429);
-  // 틀린 코드
-  assert.equal((await verifyOtp('010-2000-0001', '000000')).status, 401);
+  // 틀린 코드 (999999는 실제 발급 범위 안이지만 방금 발급된 코드와는 다름)
+  assert.equal((await verifyOtp('010-2000-0001', '999999')).status, 401);
   const ok = await verifyOtp('010-2000-0001', req1.body.devCode, '홍고객');
   assert.equal(ok.status, 200);
   assert.equal(ok.body.created, true);
@@ -59,6 +59,20 @@ test('휴대폰 인증만으로 가입/로그인: OTP 요청→검증→토큰 �
   // 같은 번호로 다시 로그인하면 새 코드 발급 후 기존 고객으로 로그인(중복 가입 없음)
   const req2 = await requestOtp('010-2000-0002'); // 다른 번호로 쿨다운 우회 확인용
   assert.notEqual(req2.status, 429);
+});
+
+test('솔라피 연동 전 임시 조치: 000000은 인증요청 없이도 항상 통과하고, 운영 환경에서는 꺼진다', async () => {
+  // requestOtp를 아예 호출하지 않은 새 번호로도 000000이면 로그인/가입된다.
+  const ok = await verifyOtp('010-2900-0001', '000000', '고정코드고객');
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.created, true);
+  // 운영 환경으로 전환하면 즉시 거부된다(문자 실연동 후 자동으로 막히는 것과 동일한 경로).
+  process.env.NODE_ENV = 'production';
+  try {
+    assert.equal((await verifyOtp('010-2900-0002', '000000')).status, 401);
+  } finally {
+    delete process.env.NODE_ENV;
+  }
 });
 
 test('가입 5회 이상 오답 시 잠기고, 하루 최대 발송 횟수를 넘으면 차단된다', async () => {

@@ -36,7 +36,8 @@ function renderLogin() {
   root().innerHTML = html`<div class="bhead"><h1>${info.shopName}</h1><p class="muted">온라인 예약</p></div>
     <div class="card"><h2>휴대폰 번호로 시작하기</h2><p class="muted">비밀번호 없이 인증번호로 간편하게 예약할 수 있어요.</p>
       <form id="pf"><label>휴대폰 번호<input name="phone" type="tel" inputmode="numeric" placeholder="010-0000-0000" required autofocus></label>
-      <button class="primary" style="width:100%;margin-top:8px">인증번호 받기</button></form></div>`.s;
+      <button class="primary" style="width:100%;margin-top:8px">인증번호 받기</button></form>
+      <p style="text-align:center;margin-top:10px"><a class="link" href="chat.html?s=${encodeURIComponent(code ?? '')}">💬 AI에게 대화로 예약 부탁하기</a></p></div>`.s;
   $('#pf').onsubmit = guard(async (e) => {
     e.preventDefault();
     const phone = fd(e.target).phone;
@@ -51,7 +52,7 @@ function renderOtp(phone, devCode) {
       <form id="vf"><div class="otpbox"><input name="code" inputmode="numeric" maxlength="6" placeholder="000000" required autofocus></div>
       <label>이름 (선택, 처음 가입 시에만 사용돼요)<input name="name" placeholder="예: 홍길동" maxlength="30"></label>
       <button class="primary" style="width:100%;margin-top:8px">확인</button></form>
-      ${devCode ? html`<p class="devcode">테스트 모드 인증번호: <b>${devCode}</b> (실제 문자 연동 전에만 표시됩니다)</p>` : ''}
+      ${devCode ? html`<p class="devcode">테스트 모드: 실제 발급된 번호는 <b>${devCode}</b> 이고, <b>000000</b>도 항상 통과돼요. (실제 문자 연동 전에만 표시됩니다)</p>` : ''}
       <p><button type="button" class="link" id="back">번호 다시 입력</button> <button type="button" class="link" id="resend">인증번호 재발송</button></p></div>`.s;
   $('#back').onclick = renderLogin;
   $('#resend').onclick = guard(async () => { const r = await post(`/api/public/${code}/otp/request`, { phone }); toast('인증번호를 다시 보냈어요.'); renderOtp(phone, r.devCode); });

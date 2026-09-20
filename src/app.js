@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { openDb } from './db.js';
 import { mockProvider } from './sms/provider.js';
+import { runTurn as defaultRunAiTurn } from './ai/bookingAgent.js';
 import { HttpError } from './util.js';
 import authRoutes from './routes/auth.js';
 import staffRoutes from './routes/staff.js';
@@ -21,12 +22,13 @@ import scheduleRoutes from './routes/schedule.js';
 import opsRoutes from './routes/ops.js';
 import insightRoutes from './routes/insight.js';
 import publicRoutes from './routes/public.js';
+import aiChatRoutes from './routes/aiChat.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export function buildApp({ db = openDb(), sms = mockProvider, logger = false, https } = {}) {
+export function buildApp({ db = openDb(), sms = mockProvider, runAiTurn = defaultRunAiTurn, logger = false, https } = {}) {
   const app = Fastify({ logger, ...(https ? { https } : {}) });
-  const ctx = { db, sms };
+  const ctx = { db, sms, runAiTurn };
 
   app.register(fastifyJwt, { secret: process.env.JWT_SECRET || 'dev-jwt-secret-change-me', sign: { expiresIn: '12h' } });
 
@@ -66,7 +68,7 @@ export function buildApp({ db = openDb(), sms = mockProvider, logger = false, ht
 
   app.get('/api/health', async () => ({ ok: true }));
 
-  for (const r of [authRoutes, staffRoutes, customerRoutes, serviceRoutes, reservationRoutes, paymentRoutes, statsRoutes, messageRoutes, adminRoutes, catalogRoutes, walletRoutes, scheduleRoutes, opsRoutes, insightRoutes, publicRoutes]) {
+  for (const r of [authRoutes, staffRoutes, customerRoutes, serviceRoutes, reservationRoutes, paymentRoutes, statsRoutes, messageRoutes, adminRoutes, catalogRoutes, walletRoutes, scheduleRoutes, opsRoutes, insightRoutes, publicRoutes, aiChatRoutes]) {
     r(app, ctx);
   }
 

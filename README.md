@@ -8,7 +8,7 @@
 npm install
 npm run seed       # 테스트 매장 + 관리자 계정 + 샘플 데이터 생성 (멱등, 운영 환경에서는 거부)
 npm start          # https://localhost:3001  (Node 24+ 필요: 내장 node:sqlite 사용, .env 자동 로드)
-npm test           # API 통합 테스트 (49건)
+npm test           # API 통합 테스트 (62건)
 node test/e2e.mjs           # 브라우저 E2E: 매장 직원 화면 (설치된 Chrome/Edge 사용)
 node test/booking-e2e.mjs   # 브라우저 E2E: 고객 온라인 예약(휴대폰 인증 가입→예약→취소)
 node test/ui-smoke.mjs      # 모든 탭/서브탭을 열어 콘솔 오류·빈 화면을 검사
@@ -17,7 +17,8 @@ node test/ui-smoke.mjs      # 모든 탭/서브탭을 열어 콘솔 오류·빈 
 | 구분 | 주소 | 계정 (개발용) |
 |---|---|---|
 | 매장 화면 | https://localhost:3001/ | `test` / `test1234` |
-| 고객 온라인 예약 | https://localhost:3001/book.html?s=`<매장 공개 코드>` | 휴대폰 인증(OTP)으로 가입, `/api/me`에서 `shop.public_code` 확인 |
+| 고객 온라인 예약(폼) | https://localhost:3001/book.html?s=`<매장 공개 코드>` | 휴대폰 인증(OTP)으로 가입, `/api/me`에서 `shop.public_code` 확인 |
+| 고객 온라인 예약(AI 챗봇) | https://localhost:3001/chat.html?s=`<매장 공개 코드>` | 로그인 화면 없음(대화 중 봇이 인증 처리). `ANTHROPIC_API_KEY` 필요 |
 | 셀프 접수 키오스크 | https://localhost:3001/kiosk.html | 매장 화면 로그인 세션 공유 |
 | 관리자 화면 | https://localhost:3001/admin.html | `admin` / (`.env`의 `ADMIN_PASSWORD`, 없으면 시드가 `admin12345!` 생성) |
 | 공개 주소 | https://smallerp.sean2022.one:3001/ | (위와 동일 DB) |
@@ -35,7 +36,10 @@ node test/ui-smoke.mjs      # 모든 탭/서브탭을 열어 콘솔 오류·빈 
 
 첫 화면에서 "신규 매장 등록"으로 매장과 사장 계정을 만들면 기본 시술 메뉴와 문자 템플릿이 생성됩니다.
 
-Claude나 ChatGPT로 예약을 받는 챗봇을 만들고 싶다면 [docs/llm-booking-integration.md](docs/llm-booking-integration.md)와 [docs/booking-api-openapi.json](docs/booking-api-openapi.json)을 참고하세요. 고객 온라인 예약 API(`/api/public/:code/...`)를 그대로 도구(tool)로 연결하면 됩니다.
+### AI로 예약받기
+- **자체 Claude 챗봇(구현됨)**: `.env`에 `ANTHROPIC_API_KEY`만 설정하면 `/chat.html?s=<코드>`에서 바로 동작합니다. 대화 중 봇이 휴대폰 인증(OTP)까지 직접 처리합니다. 키가 없으면 이 기능만 503으로 꺼지고 나머지는 정상입니다.
+- **ChatGPT Custom GPT**: [docs/booking-api-openapi.json](docs/booking-api-openapi.json)을 GPT 빌더의 Actions에 그대로 붙여넣으면 됩니다.
+- 자세한 설정 방법과 두 방식의 차이는 [docs/llm-booking-integration.md](docs/llm-booking-integration.md) 참고.
 
 ## 구현 범위
 
@@ -46,7 +50,8 @@ Claude나 ChatGPT로 예약을 받는 챗봇을 만들고 싶다면 [docs/llm-bo
 | 고객 | 고객번호 자동 부여, 검색(번호/이름/연락처), 연락처 암호화, 노쇼 주의 표시, 소개자·가족, 삭제/복구, 중복 병합, CSV 가져오기/내보내기 |
 | 기초등록 | 시술 1차 분류·2차 상세 메뉴, 회원권(횟수권), 정액권(보너스·유효기간), 할인 프리셋, 고객등급 자동 승급, 포인트 적립률, 제품·매입처·재고, 솔루션 간편설정 |
 | 예약 | 일별 목록 + 일/주 타임테이블, 근무시간·브레이크타임·휴무일·예약금지 시간대 검증, 빈 시간 조회, 상태 7종(확인필요~노쇼), 담당자 알림 문자, 네이버 예약 웹훅(멱등) |
-| 고객 온라인 예약 | `/book.html?s=<코드>`: 휴대폰 인증(OTP)만으로 가입, 빈 시간 조회→예약(담당자 지정 또는 자동 배정)→내 예약 취소. 매장별 링크는 설정 화면에서 발급·on/off·정책(자동확정/최소리드타임/최대예약일) 관리 |
+| 고객 온라인 예약 | `/book.html?s=<코드>`: 휴대폰 인증(OTP)만으로 가입, 빈 시간 조회→예약(담당자 지정 또는 자동 배정)→내 예약 취소. 매장별 링크는 설정 화면에서 발급·on/off·정책(자동확정/최소리드타임/최대예약일) 관리. Solapi 등 실연동 전까지는 인증번호 `000000`이 항상 통과(운영 환경에서는 자동 비활성화) |
+| AI 예약 도우미 | `/chat.html?s=<코드>`: Claude API 기반 대화형 예약(도구 호출로 시간 조회·인증·예약·취소 처리). `ANTHROPIC_API_KEY` 미설정 시 503으로 안전하게 비활성화. 같은 도메인 로직(`src/public-service.js`)을 폼 예약과 공유해 정책이 어긋나지 않음. ChatGPT Custom GPT Actions용 OpenAPI 스펙도 제공([docs](docs/booking-api-openapi.json)) |
 | 결제 | 시술·제품 혼합 결제, 할인 적용, 회원권 차감, 정액권/포인트/외상 결제, 환불 시 재고·횟수·잔액 전부 복원, 등급 자동 승급 |
 | 대기·현황판 | 셀프 접수 키오스크, 대기 번호표, 매장 현황판(예약중/대기중/시술중 실시간) |
 | 운영 | 입출금 관리(계정 항목), 일마감(현금 시재 차이), 출퇴근, 매장 일정 |
@@ -67,14 +72,18 @@ src/messaging.js        문자 정책/발송/자동화 엔진, 트리거 카탈�
 src/settings.js         매장별 키-값 설정(JSON)
 src/sms/provider.js     문자 에이전시 어댑터 (현재 mock)
 src/routes/*.js         도메인별 API (auth/customers/reservations/payments/catalog/wallet/schedule/ops/insight/messages/admin/...)
+src/public-service.js   고객 온라인 예약의 실제 도메인 로직 (폼 예약 라우트와 AI 예약봇이 함께 씀)
+src/ai/bookingAgent.js  Claude API 도구 호출 루프 (예약 관련 7개 도구, 인증 게이트, 세션 관리)
 public/core.js          프런트 공통: API 호출, 모달/토스트, 서브탭 페이지네이션, 표/막대 헬퍼
 public/app.js           로그인, 탭 라우팅
 public/views/*.js       탭별 화면 모듈
 public/kiosk.html·js    셀프 접수 키오스크
-public/book.html·js     고객 온라인 예약(휴대폰 인증 가입, 매장 화면과 분리된 별도 로그인 토큰)
+public/book.html·js     고객 온라인 예약 폼(휴대폰 인증 가입, 매장 화면과 분리된 별도 로그인 토큰)
+public/chat.html·js     고객 온라인 예약 AI 챗봇(로그인도 대화 중 처리)
 public/admin.html·js    플랫폼 관리자 콘솔
 src/routes/public.js    고객 온라인 예약 공개 API (앞의 전역 인증 훅에서 제외, 자체 OTP 인증)
-test/*.test.js          단위/통합 테스트 (49건)
+src/routes/aiChat.js    AI 챗봇 세션·요율제한 라우트 (runAiTurn은 buildApp에서 주입 가능 → 테스트 시 실제 Anthropic 호출 없이 검증)
+test/*.test.js          단위/통합 테스트 (62건)
 test/e2e.mjs            브라우저 E2E: 매장 직원 화면
 test/booking-e2e.mjs    브라우저 E2E: 고객 온라인 예약
 test/ui-smoke.mjs       전체 탭/서브탭 콘솔 오류 검사
@@ -92,11 +101,12 @@ test/ui-smoke.mjs       전체 탭/서브탭 콘솔 오류 검사
 | `NAVER_WEBHOOK_SECRET` | 네이버 예약 웹훅 인증 헤더 값 |
 | `ADMIN_LOGIN`, `ADMIN_PASSWORD` | 플랫폼 관리자 계정(서버 시작 시 생성/갱신) |
 | `HTTPS_CERT_PATH`, `HTTPS_KEY_PATH` | 공개 도메인용 인증서 경로 (없으면 `certs/`의 로컬 mkcert 인증서 사용) |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | 선택. AI 예약 도우미(`/chat.html`)용. 없으면 그 기능만 503으로 비활성화 |
 | `PORT`, `HOST`, `HTTP_ONLY`, `DB_FILE`, `AD_OPT_OUT` | 그 외 서버/광고 문자 설정 |
 
 ## 아직 연결되지 않은 부분 (외부 계약·인프라 필요)
 
-1. **문자 에이전시 실연동**: `src/sms/provider.js`의 `send({to, body, isAd})`를 알리고/솔라피/NHN 등으로 구현. 발신번호 사전등록 필요. 연동 전까지는 고객 온라인 예약(`/book.html`)의 인증번호가 실제로 발송되지 않고, 운영 환경이 아닐 때만 응답에 테스트용 코드(`devCode`)가 함께 내려온다(번호당 하루 8회, 60초 재발송 간격으로 제한).
+1. **문자 에이전시 실연동(Solapi 등 예정)**: `src/sms/provider.js`의 `send({to, body, isAd})`를 구현. 발신번호 사전등록 필요. 연동 전까지는 고객 온라인 예약의 인증번호가 실제로 발송되지 않아, ①운영 환경이 아닐 때만 응답에 실제 발급 코드(`devCode`)가 함께 내려오고 ②인증번호로 `000000`을 입력해도 항상 통과한다(`src/public-service.js`, 번호당 하루 8회·60초 재발송 제한은 그대로 적용). `NODE_ENV=production`이면 두 우회 모두 자동으로 꺼진다 — 실연동 후 코드에서도 제거할 것(해당 위치에 TODO 표시).
 2. **네이버 예약 공식 연동**: 웹훅 수신·멱등 처리만 구현됨. 공식 제휴/API 권한 확보 후 실제 페이로드에 맞게 매핑 조정.
 3. **카드 단말(POS/VAN) 연동**: 결제수단 금액은 현재 수동 입력.
 4. **알림톡, 080 ARS, 전화 수신 팝업(CID)**: 통신사·카카오 심사, 전화 장비 연동이 필요해 범위 밖으로 남겨둠.
