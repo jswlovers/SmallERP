@@ -1,0 +1,24 @@
+{
+  "name": "smallerp-salon-crm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "미용실/네일샵 CRM (예약·고객·결제·문자·통계)",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/index.js",
+    "dev": "node --watch --env-file-if-exists=.env src/index.js",
+    "seed": "node scripts/seed.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@fastify/jwt": "^10.2.2",
+    "@fastify/static": "^10.1.4",
+    "fastify": "^5.12.5"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.11.0"
+  }
+}

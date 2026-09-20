@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>살롱 CRM 관리자</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23222'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="login" class="center hidden">
+  <form id="loginForm" class="card narrow">
+    <h1>관리자</h1>
+    <p class="muted">플랫폼 운영자 전용</p>
+    <label>아이디<input name="loginId" required autocomplete="username"></label>
+    <label>비밀번호<input name="password" type="password" required autocomplete="current-password"></label>
+    <button class="primary">로그인</button>
+    <p class="error" id="loginErr"></p>
+  </form>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <strong>살롱 CRM 관리자</strong>
+    <span class="grow"></span>
+    <button id="pw" class="link">비밀번호 변경</button>
+    <button id="logout" class="link">로그아웃</button>
+  </header>
+  <nav id="tabs"></nav>
+  <main id="view"></main>
+</div>
+
+<dialog id="modal"><div id="modalBody"></div></dialog>
+<div id="toast"></div>
+<script type="module" src="admin.js"></script>
+</body>
+</html>

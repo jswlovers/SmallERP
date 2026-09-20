@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>살롱 CRM</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%235b5bd6'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="login" class="center hidden">
+  <form id="loginForm" class="card narrow">
+    <h1>살롱 CRM</h1>
+    <p class="muted">미용실·네일샵 고객/예약/매출 관리</p>
+    <div id="loginFields">
+      <label>아이디<input name="loginId" required autocomplete="username"></label>
+      <label>비밀번호<input name="password" type="password" required minlength="8" autocomplete="current-password"></label>
+    </div>
+    <div id="registerFields" class="hidden">
+      <label>매장명<input name="shopName"></label>
+      <label>대표자명<input name="ownerName"></label>
+    </div>
+    <button class="primary" id="loginBtn">로그인</button>
+    <button type="button" class="link" id="toggleReg">신규 매장 등록</button>
+    <p class="error" id="loginErr"></p>
+  </form>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <strong id="shopName"></strong>
+    <span class="muted" id="smsBal"></span>
+    <span class="grow"></span>
+    <span id="who" class="muted"></span>
+    <button id="logout" class="link">로그아웃</button>
+  </header>
+  <nav id="tabs"></nav>
+  <main id="view"></main>
+</div>
+
+<dialog id="modal"><div id="modalBody"></div></dialog>
+<div id="toast"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
