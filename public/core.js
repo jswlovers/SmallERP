@@ -22,7 +22,7 @@ export const METHOD = { cash: '현금', card: '카드', prepaid: '정액권', na
 export const state = { token: localStorage.getItem('token'), me: null, cache: { staff: [], services: [], categories: [] }, sub: {}, onLogout: () => {}, rerender: () => {} };
 
 export async function api(method, url, body) {
-  const res = await fetch(url, { method, headers: { 'content-type': 'application/json', ...(state.token ? { authorization: `Bearer ${state.token}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const res = await fetch(url, { method, headers: { ...(body ? { 'content-type': 'application/json' } : {}), ...(state.token ? { authorization: `Bearer ${state.token}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && state.token) { state.onLogout(); throw new Error('세션이 만료되었습니다.'); }
   if (!res.ok) throw new Error(data.error || `오류 (${res.status})`);

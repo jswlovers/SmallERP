@@ -4,6 +4,7 @@ import { creditBalance, insertSale, pointBalance, prepaidBalance } from '../wall
 import { audit } from '../audit.js';
 import { fire } from '../messaging.js';
 import { decrypt } from '../crypto.js';
+import { saleNotice } from '../sale-notice.js';
 
 /** 회원권(횟수)·정액권(예치금) 판매, 외상 수금, 포인트 조정, 잔액 조회 */
 export default function (app, ctx) {
@@ -47,7 +48,8 @@ export default function (app, ctx) {
       db.prepare("INSERT INTO pass_usage(pass_id, payment_id, delta, reason) VALUES (?,?,?, '판매')").run(id, pid, p.total_count);
       return { id, paymentId: pid, expiresAt: exp };
     });
-    await fire(ctx, shop, 'pass_sold', c, { pass: p.name, count: p.total_count, date: out.expiresAt ?? '' }, `pay${out.paymentId}`);
+    out.notice = await saleNotice(ctx, shop, c, { ...out, kind: '회원권', name: p.name, amount: `이용 횟수: ${p.total_count}회` });
+    await fire(ctx, shop, 'pass_sold', c, { pass: p.name, count: p.total_count, date: out.expiresAt ?? '무제한' }, `pay${out.paymentId}`);
     return out;
   });
 
@@ -75,7 +77,8 @@ export default function (app, ctx) {
       db.prepare('UPDATE customer SET prepaid_expires_at = ? WHERE id = ?').run(exp, c.id);
       return { paymentId: pid, balance: prepaidBalance(db, shop, c.id), expiresAt: exp };
     });
-    await fire(ctx, shop, 'stored_sold', c, { pay, credit, balance: out.balance, date: out.expiresAt ?? '' }, `pay${out.paymentId}`);
+    out.notice = await saleNotice(ctx, shop, c, { ...out, kind: '정액권', name, amount: `충전 금액: ${credit.toLocaleString('ko-KR')}원 · 총 잔액: ${out.balance.toLocaleString('ko-KR')}원` });
+    await fire(ctx, shop, 'stored_sold', c, { pay, credit, balance: out.balance, date: out.expiresAt ?? '무제한' }, `pay${out.paymentId}`);
     return out;
   });
 

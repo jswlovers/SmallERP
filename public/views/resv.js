@@ -84,9 +84,38 @@ let ttMode = 'day';
 const toMin = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
 const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
+// 타임테이블에서 칸을 눌러 예약을 막을 때 고르는 사유(6개)와 막을 시간(분)
+const BLOCK_REASONS = ['식사', '외출', '휴식', '교육', '개인사정', '금지'];
+const BLOCK_DURATIONS = [30, 60, 90, 120, 180, 240];
+const dateTimeAfter = (date, t, min) => { const m = toMin(t) + min; return m >= 1440 ? `${addDays(date, 1)}T${hhmm(m - 1440)}` : `${date}T${hhmm(m)}`; };
+
+// 클릭한 자리 옆에 뜨는 작은 창. 바깥 클릭·Esc·스크롤 시 닫힌다.
+let popEl = null, popOff = null;
+function closePop() { popEl?.remove(); popEl = null; popOff?.(); popOff = null; }
+function popover(e, content, onMount) {
+  closePop();
+  popEl = document.createElement('div');
+  popEl.className = 'ttpop';
+  popEl.innerHTML = content.s;
+  document.body.append(popEl);
+  const { width, height } = popEl.getBoundingClientRect();
+  const left = e.clientX + 8 + width > innerWidth - 8 ? Math.max(8, e.clientX - width - 8) : e.clientX + 8;
+  popEl.style.left = `${left}px`;
+  popEl.style.top = `${Math.max(8, Math.min(e.clientY - 12, innerHeight - height - 8))}px`;
+  const away = (ev) => { if (!popEl?.contains(ev.target)) closePop(); };
+  const esc = (ev) => { if (ev.key === 'Escape') closePop(); };
+  document.addEventListener('mousedown', away, true);
+  document.addEventListener('keydown', esc);
+  document.addEventListener('scroll', away, true);
+  popOff = () => { document.removeEventListener('mousedown', away, true); document.removeEventListener('keydown', esc); document.removeEventListener('scroll', away, true); };
+  onMount?.(popEl);
+}
+
 async function timetable(el, redraw) {
+  closePop();
   const cfg = (await get('/api/settings')).reservation;
-  const open = toMin(cfg.openTime), close = toMin(cfg.closeTime), step = Number(cfg.unit) || 30;
+  // 00:00~24:00 전체를 30분 단위로 그리되, 설정의 영업시간 밖은 '영업외'로 막는다
+  const open = toMin(cfg.openTime), close = toMin(cfg.closeTime), step = 30;
   const staff = activeStaff();
   const focus = resvStaff || staff[0]?.id;
   let dates, cols;
@@ -101,6 +130,7 @@ async function timetable(el, redraw) {
     get(`/api/reservations?from=${from}&to=${to}`), get('/api/blocks'), get('/api/breaks'), get('/api/days-off'),
     Promise.all(staff.map(async (s) => [s.id, await get(`/api/staff/${s.id}/schedule`)])).then(Object.fromEntries.bind(Object)),
   ]);
+  const blockAt = (c, t) => blocks.find((b) => (b.staff_id == null || b.staff_id === c.staffId) && `${c.date}T${t}` >= b.start_at && `${c.date}T${t}` < b.end_at);
   const blockedReason = (c, t) => {
     const wd = new Date(`${c.date}T00:00:00`).getDay();
     const off = offs.find((o) => o.date === c.date && (o.staff_id == null || o.staff_id === c.staffId));
@@ -108,14 +138,15 @@ async function timetable(el, redraw) {
     const sch = (scheds[c.staffId] ?? []).find((x) => x.weekday === wd);
     if (sch?.off) return '휴무';
     const m = toMin(t);
+    if (m < open || m >= close) return '영업외';
     if (sch && (m < toMin(sch.start_time) || m >= toMin(sch.end_time))) return '근무외';
     const br = breaks.find((b) => b.staff_id === c.staffId && (b.weekday == null || b.weekday === wd) && m >= toMin(b.start_time) && m < toMin(b.end_time));
     if (br) return br.label;
-    const bl = blocks.find((b) => (b.staff_id == null || b.staff_id === c.staffId) && `${c.date}T${t}` >= b.start_at && `${c.date}T${t}` < b.end_at);
+    const bl = blockAt(c, t);
     return bl ? `금지${bl.reason ? `:${bl.reason}` : ''}` : '';
   };
   const rows = [];
-  for (let m = open; m < close; m += step) rows.push(hhmm(m));
+  for (let m = 0; m < 24 * 60; m += step) rows.push(hhmm(m));
   const covered = new Set();
   const cell = (c, t) => {
     const startsHere = resv.filter((r) => r.staff_id === c.staffId && r.start_at.slice(0, 10) === c.date && toMin(r.start_at.slice(11)) >= toMin(t) && toMin(r.start_at.slice(11)) < toMin(t) + step);
@@ -123,6 +154,7 @@ async function timetable(el, redraw) {
     const why = blockedReason(c, t);
     if (evs.length) return html`<td>${evs}</td>`;
     if (covered.has(`${c.staffId}|${c.date}|${t}`)) return html`<td style="background:#f3f4ff"></td>`;
+    if (why.startsWith('금지')) return html`<td class="blk" data-blk="${blockAt(c, t).id}" style="cursor:pointer" title="눌러서 막기 해제">${why}</td>`;
     if (why) return html`<td class="blk">${why}</td>`;
     return html`<td data-new="${c.staffId}|${c.date}|${t}" style="cursor:pointer"></td>`;
   };
@@ -132,7 +164,7 @@ async function timetable(el, redraw) {
       ${ttMode === 'week' ? html`<label>담당<select id="rs">${opt(staff, focus)}</select></label>` : ''}
       <div class="fit"><button class="${ttMode === 'day' ? 'primary' : 'sec'}" id="m-day">일</button> <button class="${ttMode === 'week' ? 'primary' : 'sec'}" id="m-week">주</button>
         <button class="sec" id="prev">◀</button> <button class="sec" id="next">▶</button> <button class="primary" id="addResv">예약 추가</button></div>
-    </div><p class="muted">빈 칸을 누르면 그 시간으로 예약 등록, 예약을 누르면 상태 변경/결제. 사선 칸은 휴무·브레이크·예약금지, 옅은 보라는 진행 중인 예약입니다.</p></div>
+    </div><p class="muted">빈 칸을 누르면 예약 등록 또는 사유(식사·외출·휴식·교육·개인사정·금지)별 예약 막기, 예약을 누르면 상태 변경/결제, 금지 칸을 누르면 해제. 사선 칸은 휴무·브레이크·예약금지, 옅은 보라는 진행 중인 예약입니다.</p></div>
     <div class="card tablewrap"><table class="tt"><tr><th style="width:52px"></th>${cols.map((c) => html`<th>${c.label}</th>`)}</tr>
       ${rows.map((t) => html`<tr><td class="hr">${t}</td>${cols.map((c) => cell(c, t))}</tr>`)}</table></div>`.s;
   $('#rd', el).onchange = (e) => { resvDate = e.target.value; redraw(); };
@@ -144,8 +176,33 @@ async function timetable(el, redraw) {
   $('#next', el).onclick = () => { resvDate = addDays(resvDate, stepDate); redraw(); };
   $('#addResv', el).onclick = () => resvForm();
   el.onclick = guard(async (e) => {
-    const n = e.target.dataset.new, ev = e.target.dataset.ev;
-    if (n) { const [sid, d, t] = n.split('|'); resvForm(undefined, { staffId: +sid, date: d, time: t }); }
+    const n = e.target.dataset.new, ev = e.target.dataset.ev, blk = e.target.dataset.blk;
+    if (n) {
+      const [sid, d, t] = n.split('|');
+      // 눌린 칸 옆에 뜨는 작은 창(목록은 스크롤로 선택)
+      popover(e, html`<div class="pop-h">${d.slice(5)} ${t} · ${staff.find((s) => s.id === +sid)?.name ?? ''}</div>
+        <div class="pop-opt"><select id="bdur" title="막을 시간">${BLOCK_DURATIONS.map((x) => html`<option value="${x}">${x >= 60 ? `${x / 60}시간${x % 60 ? ' 30분' : ''}` : `${x}분`}</option>`)}</select>
+          <select id="bwho" title="대상"><option value="one">이 직원만</option><option value="all">매장 전체</option></select></div>
+        <div class="pop-list"><button data-act="resv">＋ 예약 추가</button>${BLOCK_REASONS.map((r) => html`<button data-reason="${r}">${r} 막기</button>`)}</div>`, (p) => {
+        p.onclick = guard(async (ev2) => {
+          const d2 = ev2.target.dataset;
+          if (d2.act === 'resv') { closePop(); resvForm(undefined, { staffId: +sid, date: d, time: t }); }
+          if (d2.reason) {
+            const min = Number($('#bdur', p).value), all = $('#bwho', p).value === 'all';
+            await post('/api/blocks', { startAt: `${d}T${t}`, endAt: dateTimeAfter(d, t, min), staffId: all ? undefined : +sid, reason: d2.reason });
+            closePop(); toast(`예약을 막았습니다. (${d2.reason})`); redraw();
+          }
+        });
+      });
+    }
+    if (blk) {
+      const b = blocks.find((x) => x.id == blk);
+      popover(e, html`<div class="pop-h">예약금지${b.reason ? `: ${b.reason}` : ''}</div>
+        <div class="pop-opt muted">${b.start_at.slice(5).replace('T', ' ')} ~ ${b.end_at.slice(5).replace('T', ' ')}<br>${b.staff_id ? staff.find((s) => s.id === b.staff_id)?.name ?? '' : '매장 전체'}</div>
+        <div class="pop-list"><button data-unblock="${b.id}">막기 해제</button></div>`, (p) => {
+        p.onclick = guard(async (ev2) => { if (ev2.target.dataset.unblock) { await del(`/api/blocks/${b.id}`); closePop(); toast('예약금지를 해제했습니다.'); redraw(); } });
+      });
+    }
     if (ev) {
       const r = resv.find((x) => x.id == ev);
       modal(html`<h2>${r.customer_name} <span class="badge ${r.status}">${STATUS[r.status]}</span></h2><p>${r.start_at.replace('T', ' ')}~${r.end_at.slice(11)} · ${r.staff_name}<br>${r.items}</p>
