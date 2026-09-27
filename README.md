@@ -61,6 +61,8 @@ node test/ui-smoke.mjs      # 모든 탭/서브탭을 열어 콘솔 오류·빈 
 
 핸드SOS 조사 대비 남은 항목(외부 계약·하드웨어 필요)은 [docs/handsos-menu-tree.md §3](docs/handsos-menu-tree.md)에 정리했습니다: 카드 단말(VAN) 결제, 네이버 예약 공식 API 제휴, 알림톡/실제 문자 발송, 080 ARS, 전화 수신 팝업(CID), 전용 모바일 앱.
 
+법적 문서(초안, 사업자 정보 확정 전)와 화면별 구현 내역은 [docs/이용약관.md](docs/이용약관.md), [docs/개인정보처리방침.md](docs/개인정보처리방침.md), [docs/운영정책.md](docs/운영정책.md), [docs/화면-구현명세.md](docs/화면-구현명세.md)에 정리했습니다.
+
 ## 구조
 
 ```
