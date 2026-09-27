@@ -1,0 +1,43 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { buildApp } from '../src/app.js';
+import { openDb } from '../src/db.js';
+import { addDays, todayLocal } from '../src/util.js';
+
+test('상품 결제 안내: 실제 만료일·무제한·모의 발송·실패 후 결제 유지', async (t) => {
+  const db = openDb(':memory:');
+  const sent = [];
+  const sms = { name: 'mock', async send(message) { sent.push(message); return { ok: true }; } };
+  const app = buildApp({ db, sms });
+  t.after(async () => { await app.close(); db.close(); });
+  let token;
+  const call = async (url, payload) => {
+    const r = await app.inject({ method: 'POST', url, payload, headers: token ? { authorization: `Bearer ${token}` } : {} });
+    assert.equal(r.statusCode, 200, r.body);
+    return r.json();
+  };
+  token = (await call('/api/auth/register', { shopName: '안내샵', ownerName: '사장', loginId: 'notice', password: 'password123' })).token;
+  db.prepare('UPDATE shop SET sms_balance = 10000').run();
+  const c = await call('/api/customers', { name: '안내고객', phone: '01012345678', marketingConsent: false });
+  const p = await call('/api/pass-products', { name: '컷회원권', price: 10000, totalCount: 3, validDays: 30 });
+  const buyPass = () => call(`/api/customers/${c.id}/passes`, { productId: p.id, lines: [{ method: 'card', amount: 10000 }] });
+  const r = await buyPass();
+  assert.equal(r.notice.status, 'sent');
+  assert.equal(r.notice.simulated, true);
+  assert.ok(r.notice.body.includes(addDays(todayLocal(), 30)));
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].isAd, false);
+  const buyStored = () => call(`/api/customers/${c.id}/stored`, { payAmount: 10000, validDays: 0, lines: [{ method: 'cash', amount: 10000 }] });
+  assert.match((await buyStored()).notice.body, /유효기간 제한 없이/);
+  const later = addDays(todayLocal(), 120);
+  db.prepare('UPDATE customer SET prepaid_expires_at = ? WHERE id = ?').run(later, c.id);
+  assert.ok((await buyStored()).notice.body.includes(later));
+  sms.send = async () => { throw new Error('테스트 통신 오류'); };
+  const failed = await buyPass();
+  assert.equal(failed.notice.status, 'failed');
+  assert.ok(db.prepare('SELECT id FROM payment WHERE id = ?').get(failed.paymentId));
+  db.prepare('UPDATE shop SET sms_balance = 0').run();
+  const skipped = await buyPass();
+  assert.equal(skipped.notice.status, 'skipped');
+  assert.equal(skipped.notice.reason, '문자 잔액 부족');
+});

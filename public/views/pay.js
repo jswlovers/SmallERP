@@ -104,15 +104,24 @@ async function sell(el, redraw) {
   el.innerHTML = html`<div class="grid two">
     <div class="card"><h2>회원권(횟수권) 판매</h2><form id="pf1">${cs()}
       <label>상품<select name="productId">${opt(passes.filter((p) => p.active), '', (p) => `${p.name} · ${won(p.price)} · ${p.total_count}회${p.valid_days ? ` · ${p.valid_days}일` : ''}`)}</select></label>${lineFields}
+      <p class="muted">결제 완료 시 유효기간 안내문을 표시하고 고객 연락처로 안내 문자를 자동 발송합니다. 테스트 환경에서는 발송 내역만 기록됩니다.</p>
       <button class="primary">판매</button> <span class="muted">결제 합계는 상품 가격과 같아야 합니다.</span></form></div>
     <div class="card"><h2>정액권(예치금) 판매</h2><form id="pf2">${cs()}
       <label>상품<select name="productId">${opt(stored.filter((p) => p.active), '', (p) => `${p.name} · 결제 ${won(p.pay_amount)} → 사용 ${won(p.credit_amount)}${p.valid_days ? ` · ${p.valid_days}일` : ''}`)}</select></label>${lineFields}
+      <p class="muted">결제 완료 시 고객 잔액에 적용된 유효기간을 안내하고 문자를 자동 발송합니다. 테스트 환경에서는 발송 내역만 기록됩니다.</p>
       <button class="primary">판매</button></form></div></div>`.s;
   const sub = (id, path) => $(id, el).addEventListener('submit', guard(async (e) => {
     e.preventDefault(); const b = fd(e.target);
     if (!b.productId) throw new Error('상품을 선택하세요.');
-    await post(`/api/customers/${b.cid}/${path}`, { productId: +b.productId, lines: lines(b) });
-    toast('판매되었습니다.'); redraw();
+    const button = e.target.querySelector('button.primary');
+    button.disabled = true;
+    try {
+      const result = await post(`/api/customers/${b.cid}/${path}`, { productId: +b.productId, lines: lines(b) });
+      const n = result.notice;
+      const status = n.status === 'sent' ? (n.simulated ? '테스트 문자 기록 완료 (실제 문자 미발송)' : '안내 문자 발송 완료') : `안내 문자 미발송: ${n.reason || '발송 실패'}`;
+      await redraw();
+      modal(html`<h2>판매 완료 · 유효기간 안내</h2><p style="white-space:pre-wrap">${n.body}</p><p role="status">${status}</p><p class="muted">결제가 완료되었습니다. 문자 미발송 시 결제를 다시 하지 말고 문자 메뉴에서 발송해 주세요.</p>`);
+    } finally { button.disabled = false; }
   }));
   sub('#pf1', 'passes'); sub('#pf2', 'stored');
 }
