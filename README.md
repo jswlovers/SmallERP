@@ -16,14 +16,14 @@ node test/ui-smoke.mjs      # 모든 탭/서브탭을 열어 콘솔 오류·빈 
 
 | 구분 | 주소 | 계정 (개발용) |
 |---|---|---|
-| 매장 화면 | https://localhost:3001/ | `test` / `test1234` |
+| 매장 화면 | https://localhost:3001/ | `test1@mail.sean2022.one`(사장), `test2`·`test3@mail.sean2022.one`(직원) / 공통 테스트 암호 |
 | 고객 온라인 예약(폼) | https://localhost:3001/book.html?s=`<매장 공개 코드>` | 휴대폰 인증(OTP)으로 가입, `/api/me`에서 `shop.public_code` 확인 |
 | 고객 온라인 예약(AI 챗봇) | https://localhost:3001/chat.html?s=`<매장 공개 코드>` | 로그인 화면 없음(대화 중 봇이 인증 처리). `ANTHROPIC_API_KEY` 필요 |
 | 셀프 접수 키오스크 | https://localhost:3001/kiosk.html | 매장 화면 로그인 세션 공유 |
-| 관리자 화면 | https://localhost:3001/admin.html | `admin` / (`.env`의 `ADMIN_PASSWORD`, 없으면 시드가 `admin12345!` 생성) |
+| 관리자 화면 | https://localhost:3001/admin.html | `admin@mail.sean2022.one` / (`.env`의 `ADMIN_PASSWORD`, 없으면 시드가 공통 테스트 암호로 생성) |
 | 공개 주소 | https://smallerp.sean2022.one:3001/ | (위와 동일 DB) |
 
-> 위 계정은 개발용입니다. `test` 계정은 공개 주소에서도 로그인되므로 외부 공개 전 비밀번호를 바꾸거나(설정 > 내 계정) 삭제하세요.
+> 위 계정은 개발용입니다. 테스트 매장 계정은 공개 주소에서도 로그인되므로 외부 공개 전 비밀번호를 바꾸거나(설정 > 내 계정) 삭제하세요.
 
 ### HTTPS / 도메인
 - 서버가 TLS를 직접 처리하며 접속 호스트명(SNI)으로 인증서를 고릅니다.

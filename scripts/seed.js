@@ -1,7 +1,7 @@
 // 개발/시연용 계정과 샘플 데이터 생성 (멱등). 운영 환경에서는 실행을 거부한다.
 //   npm run seed
-//   테스트 매장 계정:  test  / test1234
-//   플랫폼 관리자:     admin / admin12345!
+//   테스트 매장 계정:  test1@mail.sean2022.one (사장), test2·test3@mail.sean2022.one (직원) / 공통 암호
+//   플랫폼 관리자:     admin@mail.sean2022.one / .env 의 ADMIN_PASSWORD
 import { buildApp } from '../src/app.js';
 import { openDb } from '../src/db.js';
 import { ensureAdmin } from '../src/bootstrap.js';
@@ -16,13 +16,13 @@ process.env.SMS_LOG = '0';
 const db = openDb();
 const app = buildApp({ db });
 
-const ADMIN = { login: process.env.ADMIN_LOGIN || 'admin', password: process.env.ADMIN_PASSWORD || 'admin12345!' };
+const ADMIN = { login: process.env.ADMIN_LOGIN || 'admin@mail.sean2022.one', password: process.env.ADMIN_PASSWORD || 'ouU@FuiVWNaEQcpZcU4n' };
 const adminFromEnv = !!process.env.ADMIN_PASSWORD;
 // 이미 관리자가 있으면 비밀번호를 덮어쓰지 않는다(변경한 비밀번호 보호)
 const adminCreated = !db.prepare('SELECT 1 FROM admin_user WHERE login_id = ?').get(ADMIN.login);
 if (adminCreated) ensureAdmin(db, ADMIN.login, ADMIN.password);
 
-const TEST = { loginId: 'test', password: 'test1234' };
+const TEST = { loginId: 'test1@mail.sean2022.one', password: 'ouU@FuiVWNaEQcpZcU4n' };
 let created = false;
 
 if (!db.prepare('SELECT 1 FROM staff WHERE login_id = ?').get(TEST.loginId)) {
@@ -39,6 +39,7 @@ if (!db.prepare('SELECT 1 FROM staff WHERE login_id = ?').get(TEST.loginId)) {
   const owner = me.staff.id;
   const d1 = (await call('POST', '/api/staff', { name: '이디자이너', commissionRate: 30 }, token)).id;
   const d2 = (await call('POST', '/api/staff', { name: '박네일', commissionRate: 40 }, token)).id;
+  for (const n of [2, 3]) await call('POST', '/api/staff', { name: `테스트${n}`, loginId: `test${n}@mail.sean2022.one`, password: TEST.password }, token);
   const svc = Object.fromEntries((await call('GET', '/api/services', null, token)).map((s) => [s.name, s]));
 
   const people = [
